@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Analysis — ATM Banking Dashboard{% endblock %}
+{% block content %}
+<div class="section-title">Data Analysis &amp; Insights</div>
+<div class="chart-grid">
+  <div class="card chart-full">{{ heatmap_chart|safe }}</div>
+  <div class="card">{{ market_chart|safe }}</div>
+  <div class="card">{{ pie_chart|safe }}</div>
+  <div class="card chart-full">{{ trend_chart|safe }}</div>
+</div>
+{% endblock %}

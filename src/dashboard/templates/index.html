@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Overview — ATM Banking Dashboard{% endblock %}
+{% block content %}
+<div class="section-title">Dashboard Overview</div>
+<div class="metrics">
+  <div class="metric-card">
+    <div class="label">Total Users</div>
+    <div class="value">{{ total_users }}</div>
+    <div class="sub">Registered account holders</div>
+  </div>
+  <div class="metric-card">
+    <div class="label">Transactions</div>
+    <div class="value">{{ "{:,.0f}".format(total_txns) }}</div>
+    <div class="sub">All-time transaction count</div>
+  </div>
+  <div class="metric-card">
+    <div class="label">Avg Balance</div>
+    <div class="value">&#x20B9;{{ "{:,.0f}".format(avg_balance) }}</div>
+    <div class="sub">Per user average</div>
+  </div>
+  <div class="metric-card">
+    <div class="label">Credit Score</div>
+    <div class="value">{{ credit_score }} <span style="font-size:14px;opacity:0.7;">/ 900</span></div>
+    <div class="sub">{{ bank_name }}</div>
+  </div>
+</div>
+<div class="chart-grid">
+  <div class="card">{{ gauge_chart|safe }}</div>
+  <div class="card">{{ top_banks_chart|safe }}</div>
+  <div class="card chart-full">{{ monthly_chart|safe }}</div>
+</div>
+{% endblock %}

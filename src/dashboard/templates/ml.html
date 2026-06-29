@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}ML Models — ATM Banking Dashboard{% endblock %}
+{% block content %}
+<div class="section-title">Machine Learning Model Status</div>
+<div class="card">
+  <h2>&#x1F916; Model Registry</h2>
+  <table>
+    <thead><tr><th>Model</th><th>Version</th><th>Metrics</th><th>Last Trained</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for name in model_names %}
+      {% set info = models_status.get(name, {}) %}
+      <tr>
+        <td style="font-weight:500;">{{ name }}</td>
+        <td>{{ info.get('version', '—') }}</td>
+        <td>
+          {% if info.get('metrics_summary') %}
+            {% for k, v in info['metrics_summary'].items() %}
+              <span class="badge badge-green">{{ k }}: {{ v }}</span>
+            {% endfor %}
+          {% else %}
+            <span class="badge badge-red">Untrained</span>
+          {% endif %}
+        </td>
+        <td>{{ info.get('last_trained', '—')[:16] }}</td>
+        <td>
+          {% if info.get('version') %}
+            <span class="badge badge-green">Trained</span>
+          {% else %}
+            <span class="badge badge-red">Not Trained</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="chart-grid">
+  <div class="card">{{ feature_imp_chart|safe }}</div>
+  <div class="card">{{ cluster_chart|safe }}</div>
+  <div class="card chart-full">{{ anomaly_chart|safe }}</div>
+</div>
+{% endblock %}

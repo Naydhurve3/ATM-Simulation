@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Monitoring — ATM Banking Dashboard{% endblock %}
+{% block content %}
+<div class="section-title">Model Performance Monitoring</div>
+<div class="card">
+  <h2>&#x1F4C8; Performance Over Versions</h2>
+  {{ perf_chart|safe }}
+</div>
+<div class="card">
+  <h2>&#x1F4CA; All Model Versions</h2>
+  <table>
+    <thead><tr><th>Model</th><th>Version</th><th>Metrics</th><th>Last Trained</th><th>Freshness</th></tr></thead>
+    <tbody>
+      {% for v in versions %}
+      <tr class="{% if v.freshness_days > 7 %}stale{% endif %}">
+        <td style="font-weight:500;">{{ v.model_name }}</td>
+        <td>{{ v.version }}</td>
+        <td>
+          {% for k, val in v.metrics.items() %}
+            <span class="badge badge-green">{{ k }}: {{ val }}</span>
+          {% endfor %}
+        </td>
+        <td>{{ v.last_trained[:16] }}</td>
+        <td>
+          {% if v.freshness_days > 7 %}
+            <span class="badge badge-red">{{ v.freshness_days }} days (stale)</span>
+          {% else %}
+            <span class="badge badge-green">{{ v.freshness_days }} days</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not versions %}
+      <tr><td colspan="5" class="empty-state">No model metrics found in database.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Personal — ATM Banking Dashboard{% endblock %}
+{% block content %}
+<div class="section-title">My Account</div>
+{% if user %}
+<div class="metrics">
+  <div class="metric-card">
+    <div class="label">Account Holder</div>
+    <div class="value" style="font-size:22px;">{{ user.get('name', '—') }}</div>
+    <div class="sub">{{ user.get('account_no', '—') }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="label">Balance</div>
+    <div class="value">&#x20B9;{{ "{:,.0f}".format(user.get('balance', 0)) }}</div>
+    <div class="sub">{{ user.get('bank', '—') }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="label">Credit Score</div>
+    <div class="value">{{ user.get('credit_score', 0) }}</div>
+    <div class="sub">{{ user.get('account_type', '').title() }}</div>
+  </div>
+  <div class="metric-card">
+    <div class="label">Card</div>
+    <div class="value" style="font-size:18px;letter-spacing:2px;">{{ user.get('card_no', '—') }}</div>
+    <div class="sub">&#x2726; Active</div>
+  </div>
+</div>
+{% else %}
+<div class="card"><div class="empty-state">No user data available. Login to see personal data.</div></div>
+{% endif %}
+<div class="chart-grid">
+  <div class="card">{{ spending_chart|safe }}</div>
+  <div class="card">{{ pie_chart|safe }}</div>
+  <div class="card chart-full">{{ goals_chart|safe }}</div>
+</div>
+<div class="card">
+  <h2>&#x1F4CB; Recent Transactions</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Fee</th><th>Balance</th><th>Channel</th></tr></thead>
+    <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td>{{ t.get('timestamp', '')[:16] }}</td>
+        <td><span class="badge {% if t.get('type') == 'deposit' %}badge-green{% else %}badge-red{% endif %}">{{ t.get('type', '') }}</span></td>
+        <td>&#x20B9;{{ "{:,.0f}".format(t.get('amount', 0)) }}</td>
+        <td>&#x20B9;{{ "{:,.0f}".format(t.get('fee', 0)) }}</td>
+        <td>&#x20B9;{{ "{:,.0f}".format(t.get('balance_after', 0)) }}</td>
+        <td>{{ t.get('channel', 'atm') }}</td>
+      </tr>
+      {% endfor %}
+      {% if not transactions %}
+      <tr><td colspan="6" class="empty-state">No transactions found</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

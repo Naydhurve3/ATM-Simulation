@@ -48,8 +48,12 @@ Thumbs.db
 # GitHub template
 .gitkeep
 
+# Vercel
+.vercel/
+.env*
+
+# Stale/remnant files
+ATM PYTHON.py
+
 # OS files
 Desktop.ini
-
-.vercel
-.env*

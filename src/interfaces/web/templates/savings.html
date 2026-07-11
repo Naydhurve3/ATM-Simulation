@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Savings Goals - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header">
+    <div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>SAVINGS GOALS</h1></div>
+    <p class="subtitle">Track your savings targets</p>
+  </div>
+  <form method="POST" class="atm-form">
+    <div class="input-group"><label>Goal Name</label><input type="text" name="goal_name" placeholder="e.g. New Car" required></div>
+    <div class="input-group"><label>Target Amount (&#8377;)</label><input type="number" name="target_amount" min="1" required></div>
+    <div class="input-group"><label>Deadline</label><input type="date" name="deadline"></div>
+    <button type="submit" class="atm-btn">CREATE GOAL</button>
+  </form>
+  {% if goals %}{% for g in goals %}
+  <div class="balance-card" style="margin-top:12px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div><strong>{{ g.goal_name }}</strong></div>
+      <div style="font-size:12px;color:#667788;">{{ g.deadline or 'No deadline' }}</div>
+    </div>
+    <div class="balance-amount" style="font-size:24px;">&#8377; {{ '%.2f'|format(g.current_amount) }} / &#8377; {{ '%.2f'|format(g.target_amount) }}</div>
+    {% if g.target_amount > 0 %}
+    <div style="background:rgba(255,255,255,0.1);border-radius:6px;height:8px;margin-top:8px;overflow:hidden;">
+      <div style="background:linear-gradient(90deg,#4fc3f7,#81c784);height:100%;width:{{ (g.current_amount / g.target_amount * 100)|round }}%;border-radius:6px;transition:width 0.5s;"></div>
+    </div>
+    <div style="text-align:right;font-size:11px;color:#8899aa;margin-top:4px;">{{ (g.current_amount / g.target_amount * 100)|round }}%</div>{% endif %}
+    {% if not g.is_completed %}
+    <form method="POST" action="{{ url_for('routes.savings_add', goal_id=g.goal_id) }}" style="margin-top:8px;display:flex;gap:8px;">
+      <input type="number" name="amount" placeholder="Add amount" min="1" style="flex:1;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:13px;">
+      <button type="submit" class="atm-btn" style="padding:8px 16px;width:auto;font-size:12px;">ADD</button>
+    </form>{% endif %}
+  </div>{% endfor %}{% else %}
+  <div class="empty-state"><p>No savings goals yet. Create one above!</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
+</div>
+{% endblock %}

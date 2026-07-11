@@ -13,7 +13,7 @@ body {
 
 .atm-container {
     width: 100%;
-    max-width: 420px;
+    max-width: 460px;
     padding: 16px;
     position: relative;
     z-index: 1;
@@ -227,9 +227,13 @@ body {
 
 .action-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
     margin-bottom: 20px;
+}
+
+@media (max-width: 400px) {
+    .action-grid { grid-template-columns: 1fr 1fr; }
 }
 
 .action-btn {

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Bank Explorer - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header">
+    <div class="atm-brand"><div class="atm-icon">&#127974;</div><h1>BANK EXPLORER</h1></div>
+    <p class="subtitle">Compare banks in our network</p>
+  </div>
+  {% if banks %}
+  <div class="txn-list">{% for b in banks %}
+    <div class="txn-item">
+      <div class="txn-info">
+        <span class="txn-type">{{ b.bank }}</span>
+        <span class="txn-date">{{ b.cnt }} account{% if b.cnt > 1 %}s{% endif %}</span>
+      </div>
+      <div style="font-size:13px;color:#4fc3f7;">Avg: &#8377; {{ '%.0f'|format(b.avg_bal or 0) }}</div>
+    </div>{% endfor %}</div>
+  {% else %}
+  <div class="empty-state"><p>No bank data available.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
+</div>
+{% endblock %}

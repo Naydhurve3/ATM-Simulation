@@ -13,25 +13,45 @@
     <div class="balance-card">
         <div class="balance-label">Available Balance</div>
         <div class="balance-amount">&#8377; {{ "%.2f"|format(account.balance) }}</div>
-        <div class="balance-acct">A/C {{ account.account_number }}</div>
+        <div class="balance-acct">A/C {{ account.account_number }} | {{ account.bank }}</div>
     </div>
 
     <div class="action-grid">
         <a href="{{ url_for('routes.deposit') }}" class="action-btn">
-            <span class="action-icon">+</span>
-            <span>Deposit</span>
+            <span class="action-icon">+</span><span>Deposit</span>
         </a>
         <a href="{{ url_for('routes.withdraw') }}" class="action-btn">
-            <span class="action-icon">-</span>
-            <span>Withdraw</span>
+            <span class="action-icon">-</span><span>Withdraw</span>
         </a>
         <a href="{{ url_for('routes.transfer') }}" class="action-btn">
-            <span class="action-icon">&#8594;</span>
-            <span>Transfer</span>
+            <span class="action-icon">&#8594;</span><span>Transfer</span>
         </a>
         <a href="{{ url_for('routes.statement') }}" class="action-btn">
-            <span class="action-icon">&#9776;</span>
-            <span>Statement</span>
+            <span class="action-icon">&#9776;</span><span>Statement</span>
+        </a>
+        <a href="{{ url_for('routes.profile') }}" class="action-btn">
+            <span class="action-icon">&#9787;</span><span>Profile</span>
+        </a>
+        <a href="{{ url_for('routes.credit_score') }}" class="action-btn">
+            <span class="action-icon">&#9733;</span><span>Credit Score</span>
+        </a>
+        <a href="{{ url_for('routes.savings') }}" class="action-btn">
+            <span class="action-icon">&#9733;</span><span>Savings Goals</span>
+        </a>
+        <a href="{{ url_for('routes.loans') }}" class="action-btn">
+            <span class="action-icon">&#8364;</span><span>Loans</span>
+        </a>
+        <a href="{{ url_for('routes.security') }}" class="action-btn">
+            <span class="action-icon">&#9888;</span><span>Security</span>
+        </a>
+        <a href="{{ url_for('routes.reports') }}" class="action-btn">
+            <span class="action-icon">&#8681;</span><span>Reports</span>
+        </a>
+        <a href="{{ url_for('routes.bank_explorer') }}" class="action-btn">
+            <span class="action-icon">&#127974;</span><span>Bank Explorer</span>
+        </a>
+        <a href="{{ url_for('routes.insights') }}" class="action-btn">
+            <span class="action-icon">&#9881;</span><span>ML Insights</span>
         </a>
     </div>
 

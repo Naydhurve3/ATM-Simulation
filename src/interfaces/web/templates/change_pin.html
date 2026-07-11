@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Change PIN - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header">
+    <div class="atm-brand"><div class="atm-icon">&#9881;</div><h1>CHANGE PIN</h1></div>
+    <p class="subtitle">Update your 4-digit security PIN</p>
+  </div>
+  <form method="POST" class="atm-form">
+    <div class="input-group"><label>Current PIN</label><input type="password" name="current_pin" maxlength="4" inputmode="numeric" pattern="[0-9]*" required autofocus></div>
+    <div class="input-group"><label>New PIN</label><input type="password" name="new_pin" maxlength="4" inputmode="numeric" pattern="[0-9]*" required></div>
+    <div class="input-group"><label>Confirm New PIN</label><input type="password" name="confirm_pin" maxlength="4" inputmode="numeric" pattern="[0-9]*" required></div>
+    <button type="submit" class="atm-btn">CHANGE PIN</button>
+  </form>
+  <div class="atm-footer-links"><a href="{{ url_for('routes.profile') }}">Back to Profile</a></div>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Transfer - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+    <div class="atm-header">
+        <div class="atm-brand">
+            <div class="atm-icon">&#8594;</div>
+            <h1>TRANSFER</h1>
+        </div>
+        <p class="subtitle">Send money to another account</p>
+    </div>
+    <form method="POST" class="atm-form">
+        <div class="input-group">
+            <label for="target_account">Target Account Number</label>
+            <input type="text" id="target_account" name="target_account" placeholder="Enter account number" required autofocus>
+        </div>
+        <div class="input-group">
+            <label for="ifsc">IFSC Code (optional)</label>
+            <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code">
+        </div>
+        <div class="input-group">
+            <label for="amount">Amount (&#8377;)</label>
+            <input type="number" id="amount" name="amount" placeholder="Enter amount" min="1" required>
+        </div>
+        <div class="input-group">
+            <label for="via">Transfer Mode</label>
+            <select id="via" name="via">
+                <option value="neft">NEFT</option>
+                <option value="imps">IMPS</option>
+                <option value="rtgs">RTGS</option>
+                <option value="upi">UPI</option>
+            </select>
+        </div>
+        <button type="submit" class="atm-btn">TRANSFER</button>
+    </form>
+    <div class="atm-footer-links">
+        <a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

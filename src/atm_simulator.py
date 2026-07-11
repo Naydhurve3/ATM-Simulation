@@ -16,6 +16,7 @@ from src.utils import hash_pin, format_currency, format_number, calculate_cash_d
 from src.bank_attributes import get_bank_attrs
 from src.data_analysis import DataAnalysis
 from src.models.real_time_fraud_detector import RealTimeFraudDetector
+from src.services import ATMService
 
 console = Console()
 
@@ -25,6 +26,7 @@ class ATMSimulator:
         self.um = user_manager
         self.bank_attrs = get_bank_attrs(user_data["bank"])
         self.da = DataAnalysis()
+        self.atm_service = ATMService()
         self.failed_attempts = 0
         self.max_attempts = 3
         self.locked = False
@@ -119,24 +121,25 @@ Thank you![/dim]""", border_style="dim", width=50))
     def bal_inq(self):
         with console.status("[bold yellow]Checking balance...", spinner="dots"):
             time.sleep(0.8)
+        result = self.atm_service.get_balance(self.user["user_id"])
+        if "error" in result:
+            console.print(f"[red]{result['error']}[/red]")
+            return
         self._reload_user()
         insight = self._cross_link_insight("balance")
-        rate = self.bank_attrs.get("savings_rate", 3.0)
         table = Table(show_header=False, box=box.ROUNDED)
         table.add_column("Detail", style="cyan")
         table.add_column("Value", style="green")
-        table.add_row("Account Holder", self.user["name"])
-        table.add_row("Account No", self.user["account_no"])
-        table.add_row("Bank", f"{self.user['bank']} ({self.user['account_type'].title()})")
-        table.add_row("Balance", f"₹{self.user['balance']:,.2f}")
-        table.add_row("Interest Rate", f"{rate}% p.a.")
-        if self.is_minor:
-            table.add_row("Daily Limit", f"₹{self.user.get('atm_daily_limit', 2000):,.0f}")
+        table.add_row("Account Holder", result["name"])
+        table.add_row("Account No", result["account_number"])
+        table.add_row("Bank", f"{result['bank']} ({result['account_type'].title()})")
+        table.add_row("Balance", f"₹{result['balance']:,.2f}")
+        table.add_row("Interest Rate", f"{result['interest_rate']}% p.a.")
+        if result.get("daily_limit"):
+            table.add_row("Daily Limit", f"₹{result['daily_limit']:,.0f}")
         console.print(table)
         if insight:
             console.print(Panel(insight, border_style="dim"))
-        self.um.record_transaction(self.user["user_id"], "balance_inquiry", 0, 0,
-                                   self.user["balance"], self.user["balance"])
 
     def _check_fraud(self, amount):
         recent_txns = self.um.get_transactions(self.user["user_id"], 10)
@@ -167,6 +170,7 @@ Thank you![/dim]""", border_style="dim", width=50))
             return
         self._reload_user()
         balance = self.user["balance"]
+        user_id = self.user["user_id"]
         amt = IntPrompt.ask("[yellow]Enter amount to withdraw[/yellow]", default=100)
         if amt <= 0:
             console.print("[red]Invalid amount.[/red]")
@@ -179,8 +183,13 @@ Thank you![/dim]""", border_style="dim", width=50))
             return
         if not self._check_daily_limit(amt):
             return
-        if not self._check_fraud(amt):
-            return
+        fraud = self.atm_service.check_fraud(user_id, amt)
+        if fraud.get("is_suspicious"):
+            console.print(f"[red]FRAUD ALERT: Suspicious transaction detected![/red]")
+            console.print(f"[dim]Score: {fraud['fraud_score']:.2f} | Reasons: {', '.join(fraud['reasons'])}[/dim]")
+            self.um.record_fraud_flag(user_id, amt, fraud["fraud_score"], "; ".join(fraud["reasons"]))
+            if not Confirm.ask("[yellow]This looks unusual. Still proceed?[/yellow]", default=False):
+                return
         fee = self._get_fee()
         total_deduction = amt + fee
         if total_deduction > balance:
@@ -190,27 +199,24 @@ Thank you![/dim]""", border_style="dim", width=50))
             return
         with console.status("[bold yellow]Processing withdrawal...", spinner="dots"):
             time.sleep(1.5)
-        new_balance = balance - total_deduction
-        denominations = calculate_cash_denominations(amt)
-        self.um.update_balance(self.user["user_id"], new_balance)
-        self.um.update_atm_usage(self.user["user_id"], amt)
-        self.um.record_transaction(self.user["user_id"], "withdraw", amt, fee,
-                                    balance, new_balance, notes=str(denominations))
-        self.um.record_credit_event(self.user["user_id"], "withdrawal", amt, -1)
+        result = self.atm_service.withdraw(user_id, amt, fee)
+        if "error" in result:
+            console.print(f"[red]{result['error']}[/red]")
+            return
         table = Table(show_header=False, box=box.ROUNDED)
         table.add_column("Detail", style="cyan")
         table.add_column("Value", style="green")
-        table.add_row("Amount Debited", f"₹{amt:,.2f}")
-        table.add_row("Fee Charged", f"₹{fee:,.2f}")
-        table.add_row("Total Deducted", f"₹{total_deduction:,.2f}")
-        table.add_row("New Balance", f"₹{new_balance:,.2f}")
+        table.add_row("Amount Debited", f"₹{result['amount']:,.2f}")
+        table.add_row("Fee Charged", f"₹{result['fee']:,.2f}")
+        table.add_row("Total Deducted", f"₹{result['total_deducted']:,.2f}")
+        table.add_row("New Balance", f"₹{result['new_balance']:,.2f}")
         console.print(table)
-        denom_str = format_denominations(denominations)
+        denom_str = format_denominations(result["denominations"])
         console.print(Panel(f"[bold]Dispensing:[/bold]\n{denom_str}", border_style="green"))
         console.print(Panel("[green]✅ Please collect your cash[/green]", border_style="green"))
-        self._simulate_sms("withdraw", amt, new_balance)
-        self._simulate_receipt("withdraw", amt, fee, new_balance)
-        insight = self._cross_link_insight("withdraw", amt)
+        self._simulate_sms("withdraw", result["amount"], result["new_balance"])
+        self._simulate_receipt("withdraw", result["amount"], result["fee"], result["new_balance"])
+        insight = self._cross_link_insight("withdraw", result["amount"])
         if insight:
             console.print(Panel(insight, border_style="dim"))
         self._offer_loans_if_eligible()
@@ -226,21 +232,21 @@ Thank you![/dim]""", border_style="dim", width=50))
             return
         with console.status("[bold yellow]Processing deposit...", spinner="dots"):
             time.sleep(1.5)
-        new_balance = self.user["balance"] + amt
-        self.um.update_balance(self.user["user_id"], new_balance)
-        self.um.record_transaction(self.user["user_id"], "deposit", amt, 0,
-                                    self.user["balance"], new_balance)
-        self.um.record_credit_event(self.user["user_id"], "deposit", amt, +2)
-        console.print(Panel(f"[green]✅ ₹{amt:,.2f} deposited successfully![/green]\nNew Balance: ₹{new_balance:,.2f}",
+        result = self.atm_service.deposit(self.user["user_id"], amt)
+        if "error" in result:
+            console.print(f"[red]{result['error']}[/red]")
+            return
+        console.print(Panel(f"[green]✅ ₹{result['amount']:,.2f} deposited successfully![/green]\nNew Balance: ₹{result['new_balance']:,.2f}",
                             border_style="green"))
-        self._simulate_sms("deposit", amt, new_balance)
-        self._simulate_receipt("deposit", amt, 0, new_balance)
+        self._simulate_sms("deposit", result["amount"], result["new_balance"])
+        self._simulate_receipt("deposit", result["amount"], 0, result["new_balance"])
 
     def fund_transfer(self):
         if self.is_minor:
             console.print("[yellow]👶 Transfer not available for minor accounts.[/yellow]")
             return
         self._reload_user()
+        user_id = self.user["user_id"]
         console.print("[yellow]Transfer options:[/yellow]")
         console.print("1. To another account (within bank)")
         console.print("2. To UPI ID")
@@ -258,31 +264,31 @@ Thank you![/dim]""", border_style="dim", width=50))
             return
         with console.status("[bold yellow]Processing transfer...", spinner="dots"):
             time.sleep(2)
-        new_balance = self.user["balance"] - amt
-        self.um.update_balance(self.user["user_id"], new_balance)
-        self.um.record_transaction(self.user["user_id"], "transfer", amt, 0,
-                                    self.user["balance"], new_balance,
-                                    channel="upi" if t_choice == "2" else "transfer",
-                                    target_account=target)
-        self.um.record_credit_event(self.user["user_id"], "transfer", amt, 0)
-        console.print(Panel(f"""[green]✅ ₹{amt:,.2f} transferred to {target}[/green]
-Remaining: ₹{new_balance:,.2f}""", border_style="green"))
-        self._simulate_sms("transfer", amt, new_balance)
+        result = self.atm_service.transfer(user_id, amt, target, is_upi=(t_choice == "2"))
+        if "error" in result:
+            console.print(f"[red]{result['error']}[/red]")
+            return
+        console.print(Panel(f"""[green]✅ ₹{result['amount']:,.2f} transferred to {result['target']}[/green]
+Remaining: ₹{result['new_balance']:,.2f}""", border_style="green"))
+        self._simulate_sms("transfer", result["amount"], result["new_balance"])
 
     def mini_statement(self):
-        txns = self.um.get_transactions(self.user["user_id"], 10)
+        result = self.atm_service.mini_statement(self.user["user_id"])
+        if "error" in result:
+            console.print(f"[red]{result['error']}[/red]")
+            return
         table = Table(title="Mini Statement (Last 10)", box=box.ROUNDED)
         table.add_column("Date", style="dim", width=14)
         table.add_column("Type", style="cyan", width=16)
         table.add_column("Amount", style="green", width=16)
         table.add_column("Balance", style="yellow", width=16)
-        for t in txns:
+        for t in result["transactions"]:
             ts = t.get("timestamp", "")[:10] if t.get("timestamp") else ""
             table.add_row(ts or "",
                          t.get("type", "").title()[:15],
                          format_currency(t.get("amount", 0)),
                          format_currency(t.get("balance_after", 0)))
-        if not txns:
+        if not result["transactions"]:
             table.add_row("", "No transactions yet", "", "")
         console.print(table)
 

@@ -1,0 +1,6 @@
+{
+    "rewrites": [
+        { "source": "/(.*)", "destination": "/app.py" }
+    ],
+    "buildCommand": "pip install -r requirements-web.txt"
+}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Reports - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header">
+    <div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>REPORTS</h1></div>
+    <p class="subtitle">Download your transaction reports</p>
+  </div>
+  <div class="action-grid" style="margin-bottom:20px;">
+    <a href="{{ url_for('routes.export_csv') }}" class="action-btn">
+      <span class="action-icon">&#8681;</span><span>Export CSV</span>
+    </a>
+    <a href="{{ url_for('routes.statement') }}" class="action-btn">
+      <span class="action-icon">&#9776;</span><span>Full Statement</span>
+    </a>
+  </div>
+  {% if account %}
+  <div class="balance-card">
+    <div class="balance-label">Account Summary</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;font-size:13px;">
+      <div><div style="color:#8899aa;">Holder</div><div>{{ account.name }}</div></div>
+      <div><div style="color:#8899aa;">Balance</div><div>&#8377; {{ '%.2f'|format(account.balance) }}</div></div>
+      <div><div style="color:#8899aa;">Transactions</div><div>{{ transactions|length }}</div></div>
+      <div><div style="color:#8899aa;">Bank</div><div>{{ account.bank }}</div></div>
+    </div>
+  </div>
+  {% endif %}
+  {% if transactions %}
+  <div class="recent-txns"><h3>Recent (up to 100)</h3>
+    <div class="txn-list">{% for t in transactions %}
+      <div class="txn-item">
+        <div class="txn-info">
+          <span class="txn-type">{{ t.type }}</span>
+          <span class="txn-date">{{ t.timestamp[:10] }}</span>
+        </div>
+        <span class="txn-amount {% if t.type in ('deposit','credit') %}positive{% else %}negative{% endif %}">
+          {% if t.type in ('deposit','credit') %}+{% else %}-{% endif %}&#8377; {{ '%.2f'|format(t.amount) }}
+        </span>
+      </div>{% endfor %}</div>
+  </div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
+</div>
+{% endblock %}

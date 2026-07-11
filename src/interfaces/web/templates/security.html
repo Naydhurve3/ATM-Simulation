@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Security - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header">
+    <div class="atm-brand"><div class="atm-icon">&#9888;</div><h1>SECURITY</h1></div>
+    <p class="subtitle">Fraud alerts & account security</p>
+  </div>
+  <div class="action-grid" style="margin-bottom:20px;">
+    <a href="{{ url_for('routes.change_pin') }}" class="action-btn">
+      <span class="action-icon">&#9881;</span><span>Change PIN</span>
+    </a>
+    <a href="{{ url_for('routes.profile') }}" class="action-btn">
+      <span class="action-icon">&#9787;</span><span>Edit Profile</span>
+    </a>
+  </div>
+  {% if flags %}
+  <div class="recent-txns"><h3>Fraud Alerts</h3>
+    <div class="txn-list">{% for f in flags %}
+      <div class="txn-item">
+        <div class="txn-info">
+          <span class="txn-type">Anomaly Score: {{ '%.2f'|format(f.anomaly_score) }}</span>
+          <span class="txn-date">{{ f.flagged_at[:19] }}</span>
+        </div>
+        <div style="font-size:11px;color:#e57373;">{{ f.flagged_by }}</div>
+      </div>{% endfor %}</div>
+  </div>{% else %}
+  <div class="empty-state"><p>No fraud alerts. Your account is secure.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
+</div>
+{% endblock %}

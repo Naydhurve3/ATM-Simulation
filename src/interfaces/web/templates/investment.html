@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Investment Suggestions - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>INVESTMENTS</h1></div><p class="subtitle">Personalized portfolio suggestions</p></div>
+  <div class="balance-card" style="margin-bottom:12px;">
+    <div class="balance-label">Available for Investment</div>
+    <div class="balance-amount">&#8377; {{ '%.0f'|format(account.balance * 0.7) }}</div>
+    <div style="font-size:12px;color:#667788;">70% of &#8377; {{ '%.0f'|format(account.balance) }} balance</div>
+  </div>
+  <div style="display:flex;gap:6px;margin-bottom:16px;justify-content:center;">
+    <a href="?risk=conservative" class="action-btn" style="padding:8px 12px;{% if risk=='conservative' %}border-color:#4fc3f7;{% endif %}"><span style="font-size:11px;">Conservative</span></a>
+    <a href="?risk=moderate" class="action-btn" style="padding:8px 12px;{% if risk=='moderate' %}border-color:#4fc3f7;{% endif %}"><span style="font-size:11px;">Moderate</span></a>
+    <a href="?risk=aggressive" class="action-btn" style="padding:8px 12px;{% if risk=='aggressive' %}border-color:#4fc3f7;{% endif %}"><span style="font-size:11px;">Aggressive</span></a>
+  </div>
+  {% if suggestions %}{% for s in suggestions %}
+  <div class="balance-card" style="margin-bottom:8px;padding:14px;">
+    <div style="display:flex;justify-content:space-between;">
+      <strong>{{ s.category or s.get('category','') }}</strong>
+      <span style="color:#4fc3f7;">{{ s.total_pct or s.get('total_pct','') }}%</span>
+    </div>
+    {% if s.get('products') %}{% for p in s.products %}
+    <div class="txn-item" style="padding:4px 0;">
+      <div class="txn-info"><span class="txn-type">{{ p.name or p.get('name','') }}</span><span class="txn-notes">{{ p.reason or p.get('reason','') }}</span></div>
+      <span style="font-size:13px;color:#4fc3f7;">{{ p.allocation or p.get('allocation','') }}%</span>
+    </div>{% endfor %}{% endif %}
+  </div>{% endfor %}{% else %}
+  <div class="empty-state"><p>No suggestions available.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
+</div>{% endblock %}

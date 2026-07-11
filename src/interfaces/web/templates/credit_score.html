@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Credit Score - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header">
+    <div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>CREDIT SCORE</h1></div>
+    <p class="subtitle">Your credit health overview</p>
+  </div>
+  <div class="balance-card">
+    <div class="balance-label">Current Credit Score</div>
+    <div class="balance-amount">{{ account.credit_score }}</div>
+    <div style="margin-top:8px;font-size:12px;color:#667788;">
+      {% if account.credit_score >= 750 %}<span style="color:#81c784;">Excellent</span>
+      {% elif account.credit_score >= 650 %}<span style="color:#4fc3f7;">Good</span>
+      {% elif account.credit_score >= 550 %}<span style="color:#ffd54f;">Fair</span>
+      {% else %}<span style="color:#e57373;">Needs Improvement</span>{% endif %}
+    </div>
+  </div>
+  {% if history %}
+  <div class="recent-txns"><h3>Score History</h3>
+    <div class="txn-list">{% for h in history %}
+      <div class="txn-item">
+        <div class="txn-info">
+          <span class="txn-type">{{ h.event_type }}</span>
+          <span class="txn-date">{{ h.recorded_at[:10] }}</span>
+        </div>
+        <span class="txn-amount {% if h.score_impact >= 0 %}positive{% else %}negative{% endif %}">
+          {% if h.score_impact >= 0 %}+{% endif %}{{ h.score_impact }}
+        </span>
+      </div>{% endfor %}</div>
+  </div>{% else %}
+  <div class="empty-state"><p>No credit events recorded yet.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
+</div>
+{% endblock %}

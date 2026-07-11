@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Loan Applications - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#8364;</div><h1>LOANS</h1></div><p class="subtitle">Apply & track loan applications</p></div>
+  {% if offers %}
+  <div class="recent-txns"><h3>Pre-approved Offers</h3><div class="txn-list">{% for o in offers %}
+    <div class="txn-item">
+      <div class="txn-info"><span class="txn-type">{{ o.type }}</span><span class="txn-date">Up to &#8377; {{ '%.0f'|format(o.max) }}</span></div>
+      <div style="text-align:right;font-size:12px;color:#4fc3f7;">{{ o.rate }} | {{ o.tenure }}</div>
+    </div>{% endfor %}</div></div>
+  {% endif %}
+  <form method="POST" class="atm-form">
+    <div class="input-group"><label>Loan Type</label><select name="loan_type">
+      <option value="personal">Personal Loan</option><option value="home">Home Loan</option>
+      <option value="car">Car Loan</option><option value="education">Education Loan</option>
+      <option value="business">Business Loan</option><option value="gold">Gold Loan</option>
+    </select></div>
+    <div class="input-group"><label>Amount (&#8377;)</label><input type="number" name="amount" min="1000" required></div>
+    <div class="input-group"><label>Tenure</label><select name="tenure">
+      <option value="6">6 months</option><option value="12" selected>1 year</option>
+      <option value="24">2 years</option><option value="36">3 years</option><option value="60">5 years</option>
+    </select></div>
+    <button type="submit" class="atm-btn">APPLY</button>
+  </form>
+  {% if applications %}<div class="recent-txns" style="margin-top:16px;"><h3>Your Applications</h3><div class="txn-list">{% for a in applications %}
+    <div class="txn-item">
+      <div class="txn-info"><span class="txn-type">{{ a.loan_type }} Loan</span><span class="txn-date">{{ a.applied_at[:10] }}</span></div>
+      <div style="text-align:right;">
+        <div style="font-weight:600;">&#8377; {{ '%.0f'|format(a.amount_requested) }}</div>
+        <div style="font-size:11px;color:{% if a.status == 'approved' %}#81c784{% elif a.status == 'rejected' %}#e57373{% else %}#ffd54f{% endif %};">{{ a.status|upper }}</div>
+      </div>
+    </div>{% endfor %}</div></div>
+  {% else %}<div class="empty-state"><p>No applications yet.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
+</div>{% endblock %}

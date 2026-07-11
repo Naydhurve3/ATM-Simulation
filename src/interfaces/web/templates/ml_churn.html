@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Churn Analysis - ML Insights{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9888;</div><h1>CHURN ANALYSIS</h1></div><p class="subtitle">Predict your churn risk</p></div>
+  {% if churn %}{% if churn.get('error') %}
+  <div class="empty-state"><p>ML model unavailable: {{ churn.error[:80] }}</p></div>
+  {% else %}
+  <div class="balance-card">
+    <div class="balance-label">Churn Risk</div>
+    <div class="balance-amount" style="font-size:24px;">{{ '%.1f'|format(churn.churn_probability or churn.get('probability', 0) * 100) }}%</div>
+  </div>
+  <div class="txn-list">{% for k, v in churn.items() %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div>{{ v }}</div></div>{% endfor %}</div>
+  {% endif %}{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.insights') }}">Back</a></div>
+</div>{% endblock %}

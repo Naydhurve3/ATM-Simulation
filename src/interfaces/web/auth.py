@@ -86,10 +86,9 @@ def register():
         flash("Email or phone already registered", "error")
         return render_template("register.html")
 
-    from src.user_manager import UserManager
-    um = UserManager()
-    account_no = um._generate_account_no()
-    card_no = um._generate_card_no()
+    import random
+    account_no = "".join([str(random.randint(0, 9)) for _ in range(12)])
+    card_no = "-".join(["".join([str(random.randint(0, 9)) for _ in range(4)]) for _ in range(4)])
 
     c.execute(
         """INSERT INTO users (name, email, phone, pin_hash, account_no, card_no, balance,

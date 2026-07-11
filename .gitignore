@@ -50,3 +50,6 @@ Thumbs.db
 
 # OS files
 Desktop.ini
+
+.vercel
+.env*

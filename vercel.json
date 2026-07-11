@@ -1,0 +1,12 @@
+{
+    "rewrites": [
+        { "source": "/(.*)", "destination": "/app.py" }
+    ],
+    "buildCommand": "pip install -r requirements-web.txt",
+    "functions": {
+        "app.py": {
+            "memory": 512,
+            "maxDuration": 30
+        }
+    }
+}

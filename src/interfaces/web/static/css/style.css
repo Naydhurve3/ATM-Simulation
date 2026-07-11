@@ -8,12 +8,21 @@ body {
     align-items: center;
     justify-content: center;
     color: #e0e8f0;
+    overflow-x: hidden;
 }
 
 .atm-container {
     width: 100%;
     max-width: 420px;
     padding: 16px;
+    position: relative;
+    z-index: 1;
+    animation: containerFadeIn 0.8s ease-out;
+}
+
+@keyframes containerFadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .screen {
@@ -24,6 +33,16 @@ body {
     border-radius: 16px;
     padding: 32px 24px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    animation: screenSlideUp 0.6s ease-out forwards;
+    opacity: 0;
+}
+
+.screen:nth-child(2) { animation-delay: 0.1s; }
+.screen:nth-child(3) { animation-delay: 0.2s; }
+
+@keyframes screenSlideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .atm-header {
@@ -42,6 +61,12 @@ body {
 .atm-icon {
     font-size: 28px;
     color: #4fc3f7;
+    animation: iconPulse 2s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.1); opacity: 0.8; }
 }
 
 .atm-brand h1 {
@@ -80,12 +105,13 @@ body {
     color: #fff;
     font-size: 15px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .input-group input:focus,
 .input-group select:focus {
     border-color: #4fc3f7;
+    box-shadow: 0 0 0 3px rgba(79, 195, 247, 0.15);
 }
 
 .input-group select option {
@@ -105,11 +131,31 @@ body {
     letter-spacing: 3px;
     cursor: pointer;
     transition: transform 0.15s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.atm-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s, height 0.4s;
+}
+
+.atm-btn:active::after {
+    width: 300px;
+    height: 300px;
 }
 
 .atm-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(79, 195, 247, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(79, 195, 247, 0.35);
 }
 
 .atm-btn:active {
@@ -125,12 +171,18 @@ body {
     border-radius: 8px;
     font-size: 13px;
     margin-bottom: 8px;
+    animation: flashSlideIn 0.3s ease-out;
+}
+
+@keyframes flashSlideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to   { opacity: 1; transform: translateX(0); }
 }
 
 .flash-success { background: rgba(76, 175, 80, 0.2); border: 1px solid rgba(76, 175, 80, 0.3); color: #81c784; }
-.flash-error { background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.3); color: #e57373; }
+.flash-error   { background: rgba(244, 67, 54, 0.2); border: 1px solid rgba(244, 67, 54, 0.3); color: #e57373; }
 .flash-warning { background: rgba(255, 193, 7, 0.2); border: 1px solid rgba(255, 193, 7, 0.3); color: #ffd54f; }
-.flash-info { background: rgba(33, 150, 243, 0.2); border: 1px solid rgba(33, 150, 243, 0.3); color: #64b5f6; }
+.flash-info    { background: rgba(33, 150, 243, 0.2); border: 1px solid rgba(33, 150, 243, 0.3); color: #64b5f6; }
 
 .balance-card {
     background: linear-gradient(135deg, rgba(79, 195, 247, 0.15), rgba(2, 136, 209, 0.1));
@@ -139,6 +191,12 @@ body {
     padding: 20px;
     text-align: center;
     margin-bottom: 20px;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.balance-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(79, 195, 247, 0.15);
 }
 
 .balance-label {
@@ -154,6 +212,12 @@ body {
     font-weight: 700;
     color: #fff;
     margin-bottom: 4px;
+    animation: balanceGlow 3s ease-in-out infinite;
+}
+
+@keyframes balanceGlow {
+    0%, 100% { text-shadow: 0 0 8px rgba(79, 195, 247, 0.3); }
+    50%      { text-shadow: 0 0 16px rgba(79, 195, 247, 0.6); }
 }
 
 .balance-acct {
@@ -187,7 +251,8 @@ body {
 .action-btn:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(79, 195, 247, 0.3);
-    transform: translateY(-2px);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 .action-icon {
@@ -211,6 +276,14 @@ body {
     align-items: center;
     padding: 10px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    transition: background 0.2s;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-radius: 6px;
+}
+
+.txn-item:hover {
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .txn-item:last-child {
@@ -279,3 +352,9 @@ body {
 .logout-link:hover {
     color: #ef9a9a !important;
 }
+
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+::-webkit-scrollbar-thumb { background: rgba(79,195,247,0.3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(79,195,247,0.5); }

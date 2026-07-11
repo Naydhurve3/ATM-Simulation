@@ -1,7 +1,17 @@
+import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 
-from src.data.db_manager import db
 from src.utils import hash_pin
+
+_USE_PG = os.environ.get("DATABASE_URL") is not None
+
+
+def _get_db():
+    if _USE_PG:
+        from src.data.postgres_adapter import get_pg_connection
+        return get_pg_connection()
+    from src.data.db_manager import db
+    return db.get_connection("ecosystem")
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
 
@@ -14,7 +24,7 @@ def login():
     identifier = request.form.get("identifier", "").strip()
     pin = request.form.get("pin", "").strip()
 
-    conn = db.get_connection("ecosystem")
+    conn = _get_db()
     c = conn.cursor()
 
     if "@" in identifier:
@@ -79,7 +89,7 @@ def register():
             flash(e, "error")
         return render_template("register.html")
 
-    conn = db.get_connection("ecosystem")
+    conn = _get_db()
     c = conn.cursor()
     c.execute("SELECT user_id FROM users WHERE email = ? OR phone = ?", (email, phone))
     if c.fetchone():
@@ -90,15 +100,21 @@ def register():
     account_no = "".join([str(random.randint(0, 9)) for _ in range(12)])
     card_no = "-".join(["".join([str(random.randint(0, 9)) for _ in range(4)]) for _ in range(4)])
 
-    c.execute(
+    insert_sql = (
         """INSERT INTO users (name, email, phone, pin_hash, account_no, card_no, balance,
             account_type, bank, age, age_group, credit_score, is_minor, atm_daily_limit,
             atm_used_today, last_active)
-           VALUES (?,?,?,?,?,?,0,'savings','SBI',25,'adult',700,0,100000,0,CURRENT_TIMESTAMP)""",
-        (name, email, phone, hash_pin(pin), account_no, card_no),
+           VALUES (?,?,?,?,?,?,0,'savings','SBI',25,'adult',700,0,100000,0,CURRENT_TIMESTAMP)"""
     )
+    if _USE_PG:
+        insert_sql += " RETURNING user_id"
+    c.execute(insert_sql, (name, email, phone, hash_pin(pin), account_no, card_no))
     conn.commit()
-    user_id = c.lastrowid
+    if _USE_PG:
+        row = c.fetchone()
+        user_id = row[0] if row else None
+    else:
+        user_id = c.lastrowid
 
     session["user_id"] = user_id
     session["user_name"] = name

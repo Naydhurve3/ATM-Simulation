@@ -1,5 +1,8 @@
+import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, Response
 from functools import wraps
+
+_USE_PG = os.environ.get("DATABASE_URL") is not None
 
 routes_bp = Blueprint("routes", __name__)
 
@@ -25,6 +28,9 @@ def _acct():
 
 
 def _conn():
+    if _USE_PG:
+        from src.data.postgres_adapter import get_pg_connection
+        return get_pg_connection()
     from src.data.db_manager import db
     return db.get_connection("ecosystem")
 

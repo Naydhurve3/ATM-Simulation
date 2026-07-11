@@ -5,6 +5,8 @@ import hashlib
 import sqlite3
 from pathlib import Path
 
+_USE_PG = os.environ.get("DATABASE_URL") is not None
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -136,6 +138,10 @@ if os.environ.get("VERCEL") == "1":
         run_migration()
     except Exception:
         pass
+
+elif _USE_PG:
+    from src.data.postgres_adapter import init_db as pg_init
+    pg_init()
 
 from src.interfaces.web import create_app
 

@@ -40,10 +40,23 @@ class AccountRepository:
             pin_hash=u["pin_hash"],
         )
 
+    def find_by_user_id_v2(self, user_id: int) -> Optional[dict]:
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute("SELECT * FROM accounts_v2 WHERE user_id = ?", (user_id,))
+        row = c.fetchone()
+        if not row:
+            return None
+        cols = [d[0] for d in c.description]
+        return dict(zip(cols, row))
+
     def update_balance(self, user_id: int, new_balance: float):
         conn = self._get_conn()
         c = conn.cursor()
         c.execute("UPDATE users SET balance = ? WHERE user_id = ?", (new_balance, user_id))
+        new_paise = int(round(new_balance * 100))
+        c.execute("UPDATE accounts_v2 SET balance_paise = ? WHERE user_id = ?",
+                  (new_paise, user_id))
         conn.commit()
 
     def update_daily_usage(self, user_id: int, amount: float):
@@ -52,6 +65,11 @@ class AccountRepository:
         c.execute(
             "UPDATE users SET atm_used_today = atm_used_today + ? WHERE user_id = ?",
             (amount, user_id),
+        )
+        amount_paise = int(round(amount * 100))
+        c.execute(
+            "UPDATE accounts_v2 SET used_today_paise = used_today_paise + ? WHERE user_id = ?",
+            (amount_paise, user_id),
         )
         conn.commit()
         c.execute(

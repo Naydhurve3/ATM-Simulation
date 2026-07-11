@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Statement - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+    <div class="atm-header">
+        <div class="atm-brand">
+            <div class="atm-icon">&#9776;</div>
+            <h1>STATEMENT</h1>
+        </div>
+        <p class="subtitle">Transaction history</p>
+    </div>
+
+    {% if transactions %}
+    <div class="txn-list full">
+        {% for txn in transactions %}
+        <div class="txn-item txn-{{ txn.type.lower() }}">
+            <div class="txn-info">
+                <span class="txn-type">{{ txn.type }}</span>
+                <span class="txn-date">{{ txn.timestamp[:19] }}</span>
+                {% if txn.notes_given %}
+                <span class="txn-notes">{{ txn.notes_given }}</span>
+                {% endif %}
+            </div>
+            <span class="txn-amount {% if txn.type in ('deposit','credit') %}positive{% else %}negative{% endif %}">
+                {% if txn.type in ('deposit','credit') %}+{% else %}-{% endif %}&#8377; {{ "%.2f"|format(txn.amount) }}
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No transactions yet.</p>
+    </div>
+    {% endif %}
+
+    <div class="atm-footer-links">
+        <a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

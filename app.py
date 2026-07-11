@@ -60,6 +60,37 @@ def _init_database(db_path: Path):
             score_impact REAL,
             recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS loan_applications (
+            loan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(user_id),
+            loan_type TEXT, amount_requested REAL,
+            amount_approved REAL, interest_rate REAL,
+            tenure_months INTEGER, status TEXT,
+            risk_score REAL, predicted_default REAL,
+            applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            decision_at TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(user_id),
+            login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            logout_at TIMESTAMP, actions_count INTEGER DEFAULT 0,
+            scenario_exported BOOLEAN DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS savings_goals (
+            goal_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(user_id),
+            goal_name TEXT, target_amount REAL,
+            current_amount REAL DEFAULT 0, deadline TEXT,
+            is_completed BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS feedback (
+            feedback_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(user_id),
+            rating INTEGER, comments TEXT, category TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
 
     pin_hash = hashlib.sha256(b"1234").hexdigest()

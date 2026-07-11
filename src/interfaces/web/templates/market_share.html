@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Market Share - Analytics{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>MARKET SHARE</h1></div><p class="subtitle">Bank market share analysis</p></div>
+  {% if market_share %}<div class="txn-list">{% for b in market_share %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ b.get('Bank', 'Unknown') }}</span></div><div style="font-weight:600;">{{ '%.1f'|format(b.get('Market_Share', 0)) }}%</div></div>{% endfor %}</div>
+  {% else %}<div class="empty-state"><p>RBI data not available. Install dependencies and run data ingestion first.</p></div>{% endif %}
+  {% if top_banks %}<div class="recent-txns" style="margin-top:16px;"><h3>Top Banks</h3><div class="txn-list">{% for b in top_banks %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ b.get('bank', b.get('Bank', 'Unknown')) }}</span></div><div style="font-weight:600;">{{ b.get('cnt', b.get('share', '')) }}</div></div>{% endfor %}</div></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
+</div>{% endblock %}

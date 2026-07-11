@@ -2,32 +2,26 @@
 {% block title %}ML Insights - ATM Banking{% endblock %}
 {% block content %}
 <div class="screen">
-  <div class="atm-header">
-    <div class="atm-brand"><div class="atm-icon">&#9881;</div><h1>ML INSIGHTS</h1></div>
-    <p class="subtitle">AI-powered banking analytics</p>
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9881;</div><h1>ML INSIGHTS</h1></div><p class="subtitle">AI-powered banking analytics</p></div>
+  <div class="action-grid">
+    <a href="{{ url_for('routes.ml_credit_prediction') }}" class="action-btn"><span class="action-icon">&#9733;</span><span>Credit Predict</span></a>
+    <a href="{{ url_for('routes.ml_churn_analysis') }}" class="action-btn"><span class="action-icon">&#9888;</span><span>Churn Risk</span></a>
+    <a href="{{ url_for('routes.ml_loan_default') }}" class="action-btn"><span class="action-icon">&#8364;</span><span>Loan Default</span></a>
+    <a href="{{ url_for('routes.ml_bank_recommendation') }}" class="action-btn"><span class="action-icon">&#127974;</span><span>Bank Rec</span></a>
   </div>
-  <div class="empty-state">
-    <p>Machine learning insights require heavy dependencies (TensorFlow, Prophet, scikit-learn).</p>
-    <p style="margin-top:8px;font-size:12px;color:#667788;">Run locally with full CLI for the complete ML suite.</p>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Fraud Detection</div>
-      <div style="font-size:13px;color:#4fc3f7;">Real-time</div>
+      <div style="font-size:11px;color:#8899aa;">Fraud Detection</div><div style="font-size:13px;color:#4fc3f7;">Real-time</div>
     </div>
     <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Credit Scoring</div>
-      <div style="font-size:13px;">Score: {{ account.credit_score }}</div>
+      <div style="font-size:11px;color:#8899aa;">Credit Score</div><div style="font-size:13px;">{{ account.credit_score }}</div>
     </div>
     <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Balance</div>
-      <div style="font-size:13px;">&#8377; {{ '%.0f'|format(account.balance) }}</div>
+      <div style="font-size:11px;color:#8899aa;">Balance</div><div style="font-size:13px;">&#8377; {{ '%.0f'|format(account.balance) }}</div>
     </div>
     <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Bank</div>
-      <div style="font-size:13px;">{{ account.bank }}</div>
+      <div style="font-size:11px;color:#8899aa;">Bank</div><div style="font-size:13px;">{{ account.bank }}</div>
     </div>
   </div>
-  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
-</div>
-{% endblock %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
+</div>{% endblock %}

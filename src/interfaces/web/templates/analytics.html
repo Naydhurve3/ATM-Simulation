@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Analytics - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>ANALYTICS</h1></div><p class="subtitle">Your personal banking analytics</p></div>
+  <div class="balance-card" style="margin-bottom:12px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><div style="font-size:11px;color:#8899aa;">Total Spent</div><div style="font-size:18px;font-weight:700;color:#e57373;">&#8377; {{ '%.0f'|format(spending.total_spent or 0) }}</div></div>
+      <div><div style="font-size:11px;color:#8899aa;">Total Deposited</div><div style="font-size:18px;font-weight:700;color:#81c784;">&#8377; {{ '%.0f'|format(income.total_dep or 0) }}</div></div>
+      <div><div style="font-size:11px;color:#8899aa;">Spending Txns</div><div style="font-size:18px;font-weight:700;">{{ spending.txn_count or 0 }}</div></div>
+      <div><div style="font-size:11px;color:#8899aa;">Deposit Txns</div><div style="font-size:18px;font-weight:700;">{{ income.txn_count or 0 }}</div></div>
+    </div>
+  </div>
+  <div class="action-grid">
+    <a href="{{ url_for('routes.monthly_trend') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Monthly Trend</span></a>
+    <a href="{{ url_for('routes.channel_breakdown') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Channels</span></a>
+    <a href="{{ url_for('routes.market_share') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Market Share</span></a>
+    <a href="{{ url_for('routes.growth_rate') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Growth Rate</span></a>
+    <a href="{{ url_for('routes.user_vs_industry') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>vs Industry</span></a>
+  </div>
+  {% if breakdown %}
+  <div class="recent-txns"><h3>Transaction Breakdown</h3><div class="txn-list">{% for b in breakdown %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ b.type }}</span></div><div style="text-align:right;"><div style="font-weight:600;">&#8377; {{ '%.0f'|format(b.tot) }}</div><div style="font-size:11px;color:#667788;">{{ b.cnt }} txns</div></div></div>{% endfor %}</div></div>
+  {% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
+</div>{% endblock %}

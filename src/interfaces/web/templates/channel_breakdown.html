@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Channel Breakdown - Analytics{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>CHANNELS</h1></div><p class="subtitle">How you transact</p></div>
+  {% if user_channels %}<div class="txn-list">{% for c in user_channels %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ c.channel or 'atm' }}</span></div><div style="text-align:right;"><div style="font-weight:600;">&#8377; {{ '%.0f'|format(c.tot) }}</div><div style="font-size:11px;color:#667788;">{{ c.cnt }} txns</div></div></div>{% endfor %}</div>
+  {% else %}<div class="empty-state"><p>No channel data yet.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
+</div>{% endblock %}

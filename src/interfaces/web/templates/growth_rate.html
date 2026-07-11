@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Growth Rate - Analytics{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>GROWTH RATE</h1></div><p class="subtitle">Industry growth trends</p></div>
+  {% if growth_rate is not none %}
+  <div class="balance-card"><div class="balance-label">Growth Rate (YoY)</div><div class="balance-amount">{{ '%.1f'|format(growth_rate) }}%</div></div>
+  {% else %}<div class="empty-state"><p>Growth data not available. Install full dependencies.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
+</div>{% endblock %}

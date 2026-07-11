@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Monthly Trend - Analytics{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>MONTHLY TREND</h1></div><p class="subtitle">Your transaction patterns over time</p></div>
+  {% if user_trends %}
+  <div class="txn-list">{% for t in user_trends %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ t.month }}</span><span class="txn-date">{{ t.type }}</span></div><div style="text-align:right;"><div style="font-weight:600;">&#8377; {{ '%.0f'|format(t.total) }}</div><div style="font-size:11px;color:#667788;">{{ t.cnt }} txns</div></div></div>{% endfor %}</div>
+  {% else %}<div class="empty-state"><p>No transaction data yet. Start banking to see trends!</p></div>{% endif %}
+  {% if fig_loaded %}<div class="empty-state"><p>RBI industry trend data loaded. Check the RBI dashboard for full charts.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back to Analytics</a></div>
+</div>{% endblock %}

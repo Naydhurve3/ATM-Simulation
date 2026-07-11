@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}You vs Industry - Analytics{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>YOU vs INDUSTRY</h1></div><p class="subtitle">Compare yourself to industry averages</p></div>
+  <div class="balance-card" style="margin-bottom:12px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div><div style="font-size:11px;color:#8899aa;">Your Bank</div><div style="font-size:16px;">{{ account.bank }}</div></div>
+      <div><div style="font-size:11px;color:#8899aa;">Your Balance</div><div style="font-size:16px;">&#8377; {{ '%.0f'|format(account.balance) }}</div></div>
+    </div>
+  </div>
+  {% if comparison %}
+  <div class="txn-list">{% for k, v in comparison.items() %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div style="font-weight:600;">{{ v }}</div></div>{% endfor %}</div>
+  {% else %}<div class="empty-state"><p>Comparison data not available. Install pandas + run data ingestion first.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
+</div>{% endblock %}

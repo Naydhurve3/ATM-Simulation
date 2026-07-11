@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Savings Optimizer - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>SAVINGS OPTIMIZER</h1></div><p class="subtitle">Optimize your savings goals</p></div>
+  {% if suggestions %}
+  {% for s in suggestions %}{% if s.months_needed is defined %}
+  <div class="balance-card">
+    <div class="balance-label">Monthly Saving Capacity</div>
+    <div class="balance-amount" style="font-size:24px;">&#8377; {{ '%.0f'|format(s.monthly_available) }}</div>
+    <div style="font-size:12px;color:#667788;">Estimated time: <strong>{{ s.months_needed }} months</strong></div>
+  </div>
+  {% else %}
+  <div class="balance-card" style="margin-bottom:8px;padding:14px;">
+    <div style="display:flex;justify-content:space-between;">
+      <strong>{{ s.goal_name }}</strong><span style="color:#4fc3f7;">{{ s.progress }}%</span>
+    </div>
+    <div style="font-size:20px;font-weight:700;">&#8377; {{ '%.0f'|format(s.current_amount) }} / &#8377; {{ '%.0f'|format(s.target_amount) }}</div>
+    {% if s.target_amount > 0 %}
+    <div style="background:rgba(255,255,255,0.1);border-radius:6px;height:6px;margin-top:6px;overflow:hidden;">
+      <div style="background:linear-gradient(90deg,#4fc3f7,#81c784);height:100%;width:{{ s.progress }}%;border-radius:6px;"></div>
+    </div>{% endif %}
+    <div style="font-size:11px;color:#4fc3f7;margin-top:4px;">Suggested: &#8377; {{ '%.0f'|format(s.suggested_monthly) }}/month</div>
+  </div>
+  {% endif %}{% endfor %}
+  {% else %}<div class="empty-state"><p>Create savings goals first to see optimization.</p></div>{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.savings') }}">Back to Goals</a></div>
+</div>{% endblock %}

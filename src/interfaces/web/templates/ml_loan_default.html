@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Loan Default Risk - ML Insights{% endblock %}
+{% block content %}
+<div class="screen">
+  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#8364;</div><h1>LOAN DEFAULT RISK</h1></div><p class="subtitle">ML-powered risk assessment</p></div>
+  {% if default_risk %}{% if default_risk.get('error') %}
+  <div class="empty-state"><p>ML model unavailable: {{ default_risk.error[:80] }}</p></div>
+  {% else %}
+  <div class="balance-card">
+    <div class="balance-label">Default Probability</div>
+    <div class="balance-amount" style="font-size:24px;">{{ '%.1f'|format(default_risk.probability or default_risk.get('default_prob', 0) * 100) }}%</div>
+  </div>
+  <div class="txn-list">{% for k, v in default_risk.items() %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div>{{ v }}</div></div>{% endfor %}</div>
+  {% endif %}{% endif %}
+  <div class="atm-footer-links"><a href="{{ url_for('routes.insights') }}">Back</a></div>
+</div>{% endblock %}

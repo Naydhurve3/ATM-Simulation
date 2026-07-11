@@ -110,11 +110,7 @@ def register():
         insert_sql += " RETURNING user_id"
     c.execute(insert_sql, (name, email, phone, hash_pin(pin), account_no, card_no))
     conn.commit()
-    if _USE_PG:
-        row = c.fetchone()
-        user_id = row[0] if row else None
-    else:
-        user_id = c.lastrowid
+    user_id = c.lastrowid
 
     session["user_id"] = user_id
     session["user_name"] = name

@@ -1,7 +1,7 @@
 import os
 import re
-import time
 import hashlib
+import urllib.parse
 
 _DATABASE_URL = os.environ.get("DATABASE_URL")
 _ENABLED = _DATABASE_URL is not None
@@ -92,9 +92,28 @@ def is_enabled():
     return _ENABLED
 
 
+def _parse_db_url(url):
+    parsed = urllib.parse.urlparse(url)
+    return {
+        "user": parsed.username,
+        "password": parsed.password,
+        "host": parsed.hostname,
+        "port": parsed.port or 5432,
+        "database": parsed.path.lstrip("/"),
+    }
+
+
 def _get_raw_conn():
     import psycopg2
-    return psycopg2.connect(_DATABASE_URL, sslmode="require")
+    params = _parse_db_url(_DATABASE_URL)
+    return psycopg2.connect(
+        user=params["user"],
+        password=params["password"],
+        host=params["host"],
+        port=params["port"],
+        dbname=params["database"],
+        sslmode="require",
+    )
 
 
 def init_db():
@@ -127,6 +146,20 @@ def init_db():
 
 # ── sqlite3-compatible wrappers ─────────────────────────────
 
+def _qmark_to_psycopg2(sql: str) -> str:
+    """Convert ? to %s, but leave %%s and string literals intact."""
+    result = []
+    in_single = False
+    for ch in sql:
+        if ch == "'":
+            in_single = not in_single
+        if ch == "?" and not in_single:
+            result.append("%s")
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
 class _PGCursor:
     def __init__(self, cur):
         self._cur = cur
@@ -134,20 +167,14 @@ class _PGCursor:
         self.lastrowid = None
 
     def execute(self, sql, params=None):
-        if params is None:
-            params = ()
-        try:
-            pg_sql = sql.replace("?", "%s")
-            self._cur.execute(pg_sql, params)
-            self.description = self._cur.description
-            if self._cur.description and self._cur.pgresult_ptr:
-                try:
-                    self.lastrowid = self._cur.fetchone()[0] if "RETURNING" in sql.upper() else None
-                except Exception:
-                    self.lastrowid = None
-            return self
-        except Exception:
-            raise
+        psycopg2_sql = _qmark_to_psycopg2(sql)
+        self._cur.execute(psycopg2_sql, params or ())
+        self.description = self._cur.description
+        if self._cur.description and "RETURNING" in sql.upper():
+            row = self._cur.fetchone()
+            if row:
+                self.lastrowid = row[0]
+        return self
 
     def executemany(self, sql, params_list):
         for p in params_list:
@@ -155,15 +182,10 @@ class _PGCursor:
         return self
 
     def fetchone(self):
-        row = self._cur.fetchone()
-        if row:
-            self.description = self._cur.description
-        return row
+        return self._cur.fetchone()
 
     def fetchall(self):
-        rows = self._cur.fetchall()
-        self.description = self._cur.description
-        return rows
+        return self._cur.fetchall()
 
     def __iter__(self):
         return iter(self.fetchall())
@@ -179,8 +201,7 @@ class _PGConnection:
         return self._conn
 
     def cursor(self):
-        raw_conn = self._ensure()
-        return _PGCursor(raw_conn.cursor())
+        return _PGCursor(self._ensure().cursor())
 
     def execute(self, sql, params=None):
         return self.cursor().execute(sql, params)
@@ -205,7 +226,6 @@ class _PGConnection:
                 self.execute(s)
 
 
-# Singleton
 _pg_conn = None
 
 

@@ -30,7 +30,8 @@ def dashboard():
     if not account:
         flash("Account not found", "error")
         return redirect(url_for("auth.logout"))
-    transactions = svc.mini_statement(session["user_id"], limit=10)
+    result = svc.mini_statement(session["user_id"], limit=10)
+    transactions = result.get("transactions", [])
     return render_template("dashboard.html", account=account, transactions=transactions)
 
 
@@ -119,5 +120,6 @@ def transfer():
 def statement():
     from src.services.atm_service import ATMService
     svc = ATMService()
-    transactions = svc.mini_statement(session["user_id"], limit=50)
+    result = svc.mini_statement(session["user_id"], limit=50)
+    transactions = result.get("transactions", [])
     return render_template("statement.html", transactions=transactions)

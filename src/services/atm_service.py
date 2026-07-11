@@ -170,11 +170,11 @@ class ATMService:
             "new_balance": new_balance,
         }
 
-    def mini_statement(self, user_id: int) -> dict:
+    def mini_statement(self, user_id: int, limit: int = 10) -> dict:
         account = self._reload_account(user_id)
         if not account:
             return {"error": "Account not found"}
-        txns = self.txn_repo.find_by_user_id(user_id, limit=10)
+        txns = self.txn_repo.find_by_user_id(user_id, limit=limit)
         return {
             "success": True,
             "transactions": [

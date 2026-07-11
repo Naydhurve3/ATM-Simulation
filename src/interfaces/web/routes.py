@@ -412,7 +412,17 @@ def investment_suggestions():
     try:
         from src.models.investment_recommender import InvestmentRecommender
         ir = InvestmentRecommender()
-        suggestions = ir.recommend(age=25, income_bracket="mid", balance=account.balance, risk_tolerance=risk)
+        result = ir.recommend(age=25, income_bracket="mid", balance=account.balance, risk_tolerance=risk)
+        if isinstance(result, dict) and "products" in result:
+            suggestions = [{"category": p.get("type", p.get("name", "Product")),
+                            "products": [p],
+                            "total_pct": p.get("allocation", p.get("pct", 0))}
+                           for p in result["products"]]
+        elif isinstance(result, list):
+            suggestions = [{"category": p.get("type", p.get("name", "Product")),
+                            "products": [p],
+                            "total_pct": p.get("allocation", p.get("pct", 0))}
+                           for p in result]
     except Exception:
         suggestions = [
             {"category": "Fixed Deposit", "products": [{"name": "FD (5.5% p.a.)", "allocation": 30, "reason": "Safe returns"}],

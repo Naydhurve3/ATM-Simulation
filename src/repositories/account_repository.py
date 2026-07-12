@@ -1,15 +1,21 @@
+import os
 from typing import Optional
 
-from src.data.db_manager import db
 from src.domain.account import Account
+
+_USE_PG = os.environ.get("DATABASE_URL") is not None
 
 
 class AccountRepository:
     def __init__(self, database=None):
-        self.database = database or db
+        self.database = database
 
     def _get_conn(self):
-        return self.database.get_connection("ecosystem")
+        if _USE_PG:
+            from src.data.postgres_adapter import get_pg_connection
+            return get_pg_connection()
+        from src.data.db_manager import db
+        return (self.database or db).get_connection("ecosystem")
 
     def find_by_user_id(self, user_id: int) -> Optional[Account]:
         conn = self._get_conn()
@@ -54,9 +60,10 @@ class AccountRepository:
         conn = self._get_conn()
         c = conn.cursor()
         c.execute("UPDATE users SET balance = ? WHERE user_id = ?", (new_balance, user_id))
-        new_paise = int(round(new_balance * 100))
-        c.execute("UPDATE accounts_v2 SET balance_paise = ? WHERE user_id = ?",
-                  (new_paise, user_id))
+        if not _USE_PG:
+            new_paise = int(round(new_balance * 100))
+            c.execute("UPDATE accounts_v2 SET balance_paise = ? WHERE user_id = ?",
+                      (new_paise, user_id))
         conn.commit()
 
     def update_daily_usage(self, user_id: int, amount: float):
@@ -66,11 +73,12 @@ class AccountRepository:
             "UPDATE users SET atm_used_today = atm_used_today + ? WHERE user_id = ?",
             (amount, user_id),
         )
-        amount_paise = int(round(amount * 100))
-        c.execute(
-            "UPDATE accounts_v2 SET used_today_paise = used_today_paise + ? WHERE user_id = ?",
-            (amount_paise, user_id),
-        )
+        if not _USE_PG:
+            amount_paise = int(round(amount * 100))
+            c.execute(
+                "UPDATE accounts_v2 SET used_today_paise = used_today_paise + ? WHERE user_id = ?",
+                (amount_paise, user_id),
+            )
         conn.commit()
         c.execute(
             "SELECT atm_used_today, atm_daily_limit FROM users WHERE user_id = ?",

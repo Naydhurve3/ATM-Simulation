@@ -102,7 +102,7 @@ def _init_database(db_path: Path):
             atm_daily_limit, atm_used_today, credit_score)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
-        "Demo User", "9876543210", "demo@atm.com", 30, "adult", 0,
+        "Demo User", "9876543210", "demo@atm.com", 30, "adult", False,
         "123456789012", "1234-5678-9012-3456", "SBI", "savings",
         pin_hash, 50000.0, 100000.0, 0, 700
     ))

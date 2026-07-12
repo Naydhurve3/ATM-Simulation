@@ -104,7 +104,7 @@ def register():
         """INSERT INTO users (name, email, phone, pin_hash, account_no, card_no, balance,
             account_type, bank, age, age_group, credit_score, is_minor, atm_daily_limit,
             atm_used_today, last_active)
-           VALUES (?,?,?,?,?,?,0,'savings','SBI',25,'adult',700,0,100000,0,CURRENT_TIMESTAMP)"""
+           VALUES (?,?,?,?,?,?,0,'savings','SBI',25,'adult',700,FALSE,100000,0,CURRENT_TIMESTAMP)"""
     )
     if _USE_PG:
         insert_sql += " RETURNING user_id"

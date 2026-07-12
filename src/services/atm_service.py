@@ -83,7 +83,7 @@ class ATMService:
             "reasons": fraud_result.get("reasons", []),
         }
 
-    def withdraw(self, user_id: int, amount: float, fee: float = 0) -> dict:
+    def withdraw(self, user_id: int, amount: float, fee: float = 0, channel: str = "atm") -> dict:
         account = self._reload_account(user_id)
         if not account:
             return {"error": "Account not found"}
@@ -106,6 +106,7 @@ class ATMService:
             fee=fee,
             balance_before=account.balance,
             balance_after=new_balance,
+            channel=channel,
             notes=str(self._get_denominations(amount)),
         )
         self.txn_repo.record_credit_event(user_id, "withdrawal", amount, -1)
@@ -115,10 +116,11 @@ class ATMService:
             "fee": fee,
             "total_deducted": total_deduction,
             "new_balance": new_balance,
+            "balance_after": new_balance,
             "denominations": self._get_denominations(amount),
         }
 
-    def deposit(self, user_id: int, amount: float) -> dict:
+    def deposit(self, user_id: int, amount: float, channel: str = "atm") -> dict:
         account = self._reload_account(user_id)
         if not account:
             return {"error": "Account not found"}
@@ -134,15 +136,17 @@ class ATMService:
             fee=0,
             balance_before=account.balance,
             balance_after=new_balance,
+            channel=channel,
         )
         self.txn_repo.record_credit_event(user_id, "deposit", amount, 2)
         return {
             "success": True,
             "amount": amount,
             "new_balance": new_balance,
+            "balance_after": new_balance,
         }
 
-    def transfer(self, user_id: int, amount: float, target: str, is_upi: bool = False) -> dict:
+    def transfer(self, user_id: int, amount: float, target: str, is_upi: bool = False, channel: str = None) -> dict:
         account = self._reload_account(user_id)
         if not account:
             return {"error": "Account not found"}
@@ -150,7 +154,7 @@ class ATMService:
         if not allowed:
             return {"error": reason}
         new_balance = account.balance - amount
-        channel = "upi" if is_upi else "transfer"
+        channel = channel or ("upi" if is_upi else "transfer")
         self.account_repo.update_balance(account.user_id, new_balance)
         self.txn_repo.record(
             user_id=user_id,

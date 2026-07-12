@@ -252,8 +252,7 @@ def savings_delete(goal_id):
 @routes_bp.route("/savings/optimize")
 @login_required
 def savings_optimize():
-    from src.data.db_manager import db
-    conn = db.get_connection("ecosystem")
+    conn = _conn()
     c = conn.cursor()
     c.execute("SELECT * FROM savings_goals WHERE user_id=? AND is_completed=0", (session["user_id"],))
     cols = [d[0] for d in c.description]
@@ -496,7 +495,8 @@ def monthly_trend():
         pass
 
     c = _c()
-    c.execute("""SELECT strftime('%Y-%m', timestamp) as month, type, SUM(amount) as total, COUNT(*) as cnt
+    date_sql = "TO_CHAR(timestamp, 'YYYY-MM')" if _USE_PG else "strftime('%Y-%m', timestamp)"
+    c.execute(f"""SELECT {date_sql} as month, type, SUM(amount) as total, COUNT(*) as cnt
                  FROM transactions WHERE user_id=? GROUP BY month, type ORDER BY month""", (session["user_id"],))
     cols = [d[0] for d in c.description]
     user_trends = [dict(zip(cols, r)) for r in c.fetchall()]

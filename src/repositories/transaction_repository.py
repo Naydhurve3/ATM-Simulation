@@ -1,16 +1,23 @@
+import os
 from typing import List, Optional
 
-from src.data.db_manager import db
+_USE_PG = os.environ.get("DATABASE_URL") is not None
 
 
 class TransactionRepository:
     def __init__(self, database=None):
-        self.database = database or db
+        self.database = database
 
     def _get_conn(self):
-        return self.database.get_connection("ecosystem")
+        if _USE_PG:
+            from src.data.postgres_adapter import get_pg_connection
+            return get_pg_connection()
+        from src.data.db_manager import db
+        return (self.database or db).get_connection("ecosystem")
 
     def _get_account_id(self, user_id: int) -> Optional[int]:
+        if _USE_PG:
+            return None
         conn = self._get_conn()
         c = conn.cursor()
         c.execute("SELECT account_id FROM accounts_v2 WHERE user_id = ?", (user_id,))
@@ -40,21 +47,22 @@ class TransactionRepository:
             (user_id, txn_type, amount, fee, balance_before,
              balance_after, channel, target_account, target_bank, notes),
         )
-        account_id = self._get_account_id(user_id)
-        if account_id:
-            amount_paise = int(round(amount * 100))
-            fee_paise = int(round(fee * 100))
-            bb_paise = int(round(balance_before * 100))
-            ba_paise = int(round(balance_after * 100))
-            c.execute(
-                """INSERT INTO transactions_v2
-                   (account_id, user_id, type, amount_paise, fee_paise,
-                    balance_before_paise, balance_after_paise,
-                    channel, target_account, notes)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                (account_id, user_id, txn_type, amount_paise, fee_paise,
-                 bb_paise, ba_paise, channel, target_account, notes),
-            )
+        if not _USE_PG:
+            account_id = self._get_account_id(user_id)
+            if account_id:
+                amount_paise = int(round(amount * 100))
+                fee_paise = int(round(fee * 100))
+                bb_paise = int(round(balance_before * 100))
+                ba_paise = int(round(balance_after * 100))
+                c.execute(
+                    """INSERT INTO transactions_v2
+                       (account_id, user_id, type, amount_paise, fee_paise,
+                        balance_before_paise, balance_after_paise,
+                        channel, target_account, notes)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (account_id, user_id, txn_type, amount_paise, fee_paise,
+                     bb_paise, ba_paise, channel, target_account, notes),
+                )
         conn.commit()
         c.execute(
             "UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE user_id = ?",

@@ -181,11 +181,18 @@ class _PGCursor:
             self.execute(sql, p)
         return self
 
+    def _convert(self, row):
+        if row is None:
+            return None
+        from datetime import datetime as _dt
+        return tuple(v.isoformat() if isinstance(v, _dt) else v for v in row)
+
     def fetchone(self):
-        return self._cur.fetchone()
+        return self._convert(self._cur.fetchone())
 
     def fetchall(self):
-        return self._cur.fetchall()
+        rows = self._cur.fetchall()
+        return [self._convert(r) for r in rows]
 
     def __iter__(self):
         return iter(self.fetchall())
@@ -201,7 +208,12 @@ class _PGConnection:
         return self._conn
 
     def cursor(self):
-        return _PGCursor(self._ensure().cursor())
+        conn = self._ensure()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return _PGCursor(conn.cursor())
 
     def execute(self, sql, params=None):
         return self.cursor().execute(sql, params)

@@ -633,7 +633,7 @@ def ml_bank_recommendation():
     try:
         from src.models.bank_recommender import BankRecommender
         br = BankRecommender()
-        recommendation = br.recommend(age=25, balance=account.balance, current_bank=account.bank)
+        recommendation = br.recommend({"age": 25, "balance": account.balance, "bank": account.bank})
     except Exception as e:
         recommendation = {"error": str(e)}
     return render_template("ml_bank_rec.html", account=account, recommendation=recommendation)

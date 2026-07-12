@@ -1,4 +1,3 @@
-import numpy as np
 from src.bank_attributes import get_bank_attrs
 from src.utils import get_bank_type
 

@@ -591,7 +591,7 @@ def ml_credit_prediction():
     try:
         from src.models.credit_scorer import CreditScorer
         cs = CreditScorer()
-        prediction = cs.predict(age=25, income=50000, balance=account.balance, txn_count=50)
+        prediction = cs.predict({"age": 25, "income": 50000, "balance": account.balance, "txn_count": 50})
     except Exception as e:
         prediction = {"error": str(e), "fallback": account.credit_score if account else 700}
     return render_template("ml_credit.html", account=account, prediction=prediction)
@@ -605,7 +605,7 @@ def ml_churn_analysis():
     try:
         from src.models.churn_predictor import ChurnPredictor
         cp = ChurnPredictor()
-        churn = cp.predict(age=25, balance=account.balance, txn_count=50, days_inactive=2)
+        churn = cp.predict({"age": 25, "balance": account.balance, "txn_count": 50, "days_inactive": 2})
     except Exception as e:
         churn = {"error": str(e)}
     return render_template("ml_churn.html", account=account, churn=churn)
@@ -619,7 +619,7 @@ def ml_loan_default():
     try:
         from src.models.loan_default_model import LoanDefaultModel
         lm = LoanDefaultModel()
-        default_risk = lm.predict(credit_score=account.credit_score, balance=account.balance, age=25)
+        default_risk = lm.predict({"credit_score": account.credit_score, "balance": account.balance, "age": 25}, 50000, 10.0, 12)
     except Exception as e:
         default_risk = {"error": str(e)}
     return render_template("ml_loan_default.html", account=account, default_risk=default_risk)

@@ -587,11 +587,12 @@ def insights():
 @login_required
 def ml_credit_prediction():
     account = _acct()
-    prediction = None
+    prediction = {}
     try:
         from src.models.credit_scorer import CreditScorer
         cs = CreditScorer()
-        prediction = cs.predict({"age": 25, "income": 50000, "balance": account.balance, "txn_count": 50})
+        score = cs.predict({"age": 25, "income": 50000, "balance": account.balance, "txn_count": 50})
+        prediction = {"predicted_score": score}
     except Exception as e:
         prediction = {"error": str(e), "fallback": account.credit_score if account else 700}
     return render_template("ml_credit.html", account=account, prediction=prediction)

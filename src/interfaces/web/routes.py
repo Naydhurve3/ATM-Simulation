@@ -547,11 +547,10 @@ def growth_rate():
         from src.data_analysis import DataAnalysis
         da = DataAnalysis()
         result = da.growth_rate()
-        if result is not None:
-            if hasattr(result, 'iloc'):
-                gr = float(result.iloc[0]) if hasattr(result, 'iloc') else float(result)
-            else:
-                gr = float(result)
+        if result is not None and hasattr(result, 'iloc') and "MoM_Growth_%" in result.columns:
+            vals = result["MoM_Growth_%"].dropna()
+            if len(vals) > 0:
+                gr = float(vals.iloc[-1])
     except Exception:
         pass
     return render_template("growth_rate.html", growth_rate=gr)

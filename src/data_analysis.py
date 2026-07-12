@@ -23,19 +23,22 @@ class DataAnalysis:
     def _build_fallback_data(self):
         from src.bank_attributes import _handcrafted
         rows = []
+        months = [("Jan-2026", 1), ("Feb-2026", 2)]
         for bank, attrs in _handcrafted.items():
-            rows.append({
-                "Bank_Name": bank,
-                "Bank_Type": attrs.get("type", "PVT"),
-                "Total_ATMs": attrs.get("branch_count", 1000),
-                "Total_Txn_Vol": attrs.get("branch_count", 1000) * 10000,
-                "Total_Txn_Val": attrs.get("branch_count", 1000) * 50000000,
-                "Digital_Share": attrs.get("digital_rating", 3) * 20,
-                "Cash_Share": 100 - attrs.get("digital_rating", 3) * 20,
-                "Total_Cards": attrs.get("branch_count", 1000) * 5000,
-                "Reporting_Month": "Jan-2026",
-                "Month_Num": 1,
-            })
+            for month_label, month_num in months:
+                scale = 1.0 if month_num == 1 else 1.05
+                rows.append({
+                    "Bank_Name": bank,
+                    "Bank_Type": attrs.get("type", "PVT"),
+                    "Total_ATMs": attrs.get("branch_count", 1000) * scale,
+                    "Total_Txn_Vol": attrs.get("branch_count", 1000) * 10000 * scale,
+                    "Total_Txn_Val": attrs.get("branch_count", 1000) * 50000000 * scale,
+                    "Digital_Share": attrs.get("digital_rating", 3) * 20,
+                    "Cash_Share": 100 - attrs.get("digital_rating", 3) * 20,
+                    "Total_Cards": attrs.get("branch_count", 1000) * 5000 * scale,
+                    "Reporting_Month": month_label,
+                    "Month_Num": month_num,
+                })
         self.df = pd.DataFrame(rows)
         self.summary = self.df.groupby("Bank_Name").agg({
             "Total_ATMs": "mean", "Total_Cards": "mean", "Total_Txn_Vol": "sum",

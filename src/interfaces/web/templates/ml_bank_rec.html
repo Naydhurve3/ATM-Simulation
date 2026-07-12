@@ -9,8 +9,8 @@
   {% if recommendation %}{% if recommendation.get('error') %}
   <div class="empty-state"><p>ML model unavailable: {{ recommendation.error[:80] }}</p></div>
   {% else %}
-  <div class="txn-list">{% for k, v in recommendation.items() %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div>{{ v }}</div></div>{% endfor %}</div>
+  <div class="txn-list">{% for bank, score in recommendation.banks %}
+    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ bank }}</span></div><div>{{ score }}%</div></div>{% endfor %}</div>
   {% endif %}{% endif %}
   <div class="atm-footer-links"><a href="{{ url_for('routes.insights') }}">Back</a></div>
 </div>{% endblock %}

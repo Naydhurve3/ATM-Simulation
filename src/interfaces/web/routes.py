@@ -629,11 +629,12 @@ def ml_loan_default():
 @login_required
 def ml_bank_recommendation():
     account = _acct()
-    recommendation = None
+    recommendation = {}
     try:
         from src.models.bank_recommender import BankRecommender
         br = BankRecommender()
-        recommendation = br.recommend({"age": 25, "balance": account.balance, "bank": account.bank})
+        result = br.recommend({"age": 25, "balance": account.balance, "bank": account.bank})
+        recommendation = {"banks": result}
     except Exception as e:
         recommendation = {"error": str(e)}
     return render_template("ml_bank_rec.html", account=account, recommendation=recommendation)

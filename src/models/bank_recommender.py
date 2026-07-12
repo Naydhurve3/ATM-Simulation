@@ -1,5 +1,4 @@
-from src.bank_attributes import get_bank_attrs
-from src.utils import get_bank_type
+from src.bank_attributes import get_bank_attrs, _handcrafted
 
 class BankRecommender:
     def __init__(self):
@@ -14,9 +13,7 @@ class BankRecommender:
         is_minor = user_data.get("is_minor", False)
         income = user_data.get("income_bracket", "not_earning_student")
         preferences = user_data.get("preferences", {})
-        from src.data_analysis import DataAnalysis
-        da = DataAnalysis()
-        banks = da.get_banks()
+        banks = list(_handcrafted.keys())
         scored = []
         for bank in banks:
             attrs = get_bank_attrs(bank)

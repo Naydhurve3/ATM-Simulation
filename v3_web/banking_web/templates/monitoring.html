@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Monitoring - ATM Banking{% endblock %}
+{% block content %}
+<div class="screen">
+    <div class="atm-header">
+        <div class="atm-brand">
+            <div class="atm-icon">&#9881;</div>
+            <h1>MODEL MONITORING</h1>
+        </div>
+        <p class="subtitle">Model health &amp; freshness</p>
+    </div>
+
+    {% if versions %}
+    <div class="txn-list full">
+        {% for v in versions %}
+        <div class="txn-item">
+            <div class="txn-info">
+                <span class="txn-type">{{ v.model_name }}</span>
+                <span class="txn-date">v{{ v.version }} | trained {{ (v.last_trained or '')[:16] or 'never' }}</span>
+                {% for k, val in v.metrics.items() %}
+                <span class="txn-notes">{{ k }}: {{ val }}</span>
+                {% endfor %}
+            </div>
+            <span class="txn-amount {% if v.freshness_days > 7 %}negative{% else %}positive{% endif %}">
+                {% if v.freshness_days > 7 %}STALE{% else %}FRESH{% endif %} ({{ v.freshness_days }}d)
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No model metrics found in database. Train models first (CLI option 3 &gt; Retrain All).</p>
+    </div>
+    {% endif %}
+
+    <div class="atm-footer-links">
+        <a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a>
+    </div>
+</div>
+{% endblock %}

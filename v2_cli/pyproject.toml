@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atm-cli"
+version = "2.0.0"
+description = "V2 — Rich terminal CLI for the ATM & Banking ecosystem (thin UI over banking-core)"
+requires-python = ">=3.10"
+dependencies = [
+    "banking-core>=1.0.0",
+    "rich>=13.0.0",
+    "plotext>=5.0.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.12.0",
+    "fpdf2>=2.5.0",
+    "openpyxl>=3.1.0",
+    "PyMuPDF>=1.23.0",
+    "Pillow>=10.0.0",
+    "flask>=3.0.0",
+    "plotly>=5.18.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["atm_cli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

@@ -23,15 +23,20 @@ htmlcov/
 .coverage.*
 *.log
 
-# Project data & outputs
-data/raw/*.csv
-data/*.db
-data/processed/
-data/models/
-outputs/charts/
-outputs/reports/
-outputs/training_data/
-logs/
+# Project data & outputs (V1 owns all shared data)
+v1_banking_core/data/raw/*.csv
+v1_banking_core/data/*.db
+v1_banking_core/data/processed/
+v1_banking_core/data/models/
+v1_banking_core/outputs/charts/
+v1_banking_core/outputs/reports/
+v1_banking_core/outputs/training_data/
+v1_banking_core/logs/
+
+# Downloaded research artifacts (scripts/download_rbi_data.py)
+v1_banking_core/data/raw/*.html
+v1_banking_core/data/raw/*.xlsx
+v1_banking_core/data/raw/sources_*.json
 
 # IDE
 .vscode/

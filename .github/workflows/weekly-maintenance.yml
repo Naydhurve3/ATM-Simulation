@@ -24,13 +24,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -e v1_banking_core
 
       - name: Regenerate architecture diagrams
-        run: python docs/architecture/generate_diagrams.py
+        run: python v1_banking_core/docs/research/generate_diagrams.py
 
       - name: Run tests
-        run: pytest tests/ -v --tb=short || true
+        run: pytest v1_banking_core/tests -v --tb=short || true
 
       - name: Commit and push any changes
         run: |

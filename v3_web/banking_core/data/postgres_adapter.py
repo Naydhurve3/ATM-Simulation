@@ -86,6 +86,14 @@ CREATE TABLE IF NOT EXISTS feedback (
     rating INTEGER, comments TEXT, category TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS user_activity (
+    activity_id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(user_id),
+    activity TEXT NOT NULL,
+    amount DOUBLE PRECISION DEFAULT 0,
+    channel TEXT DEFAULT 'web',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS atm_card_stats (
     "Bank_Name" TEXT, "ATMs_On_Site" DOUBLE PRECISION, "ATMs_Off_Site" DOUBLE PRECISION,
     "PoS" DOUBLE PRECISION, "Micro_ATMs" DOUBLE PRECISION,

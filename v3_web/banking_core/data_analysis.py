@@ -11,6 +11,16 @@ class DataAnalysis:
 
     def _load_data(self):
         try:
+            from banking_core.data.postgres_adapter import is_enabled, get_pg_connection
+            if is_enabled():
+                conn = get_pg_connection()
+                self.df = pd.read_sql('SELECT * FROM "atm_card_stats"', conn)
+                self.summary = pd.read_sql('SELECT * FROM "bank_summary"', conn)
+                self.monthly = pd.read_sql('SELECT * FROM "monthly_aggregate"', conn)
+                return
+        except Exception:
+            pass
+        try:
             if not DB_PATH.exists():
                 self.di.run_pipeline()
             self.conn = self.di.get_connection()
@@ -27,15 +37,35 @@ class DataAnalysis:
         for bank, attrs in _handcrafted.items():
             for month_label, month_num in months:
                 scale = 1.0 if month_num == 1 else 1.05
+                base = attrs.get("branch_count", 1000) * scale
                 rows.append({
                     "Bank_Name": bank,
                     "Bank_Type": attrs.get("type", "PVT"),
-                    "Total_ATMs": attrs.get("branch_count", 1000) * scale,
-                    "Total_Txn_Vol": attrs.get("branch_count", 1000) * 10000 * scale,
-                    "Total_Txn_Val": attrs.get("branch_count", 1000) * 50000000 * scale,
+                    "Total_ATMs": base,
+                    "ATMs_On_Site": base * 0.45,
+                    "ATMs_Off_Site": base * 0.55,
+                    "PoS": base * 18,
+                    "Micro_ATMs": base * 1.5,
+                    "Bharat_QR_Codes": base * 40,
+                    "UPI_QR_Codes": base * 60,
+                    "Credit_Cards_Outstanding": base * 450,
+                    "Debit_Cards_Outstanding": base * 9000,
+                    "Total_Cards": base * 9450,
+                    "CC_Vol_PoS": base * 3000, "CC_Val_PoS": base * 6000000,
+                    "CC_Vol_Online": base * 12000, "CC_Val_Online": base * 25000000,
+                    "CC_Vol_Others": base * 2000, "CC_Val_Others": base * 4000000,
+                    "CC_Vol_Cash_ATM": base * 2500, "CC_Val_Cash_ATM": base * 5000000,
+                    "CC_Total_Vol": base * 19500, "CC_Total_Val": base * 40000000,
+                    "DC_Vol_PoS": base * 15000, "DC_Val_PoS": base * 20000000,
+                    "DC_Vol_Online": base * 40000, "DC_Val_Online": base * 60000000,
+                    "DC_Vol_Others": base * 8000, "DC_Val_Others": base * 10000000,
+                    "DC_Vol_Cash_ATM": base * 25000, "DC_Val_Cash_ATM": base * 35000000,
+                    "DC_Vol_Cash_PoS": base * 4000, "DC_Val_Cash_PoS": base * 5000000,
+                    "DC_Total_Vol": base * 92000, "DC_Total_Val": base * 130000000,
+                    "Total_Txn_Vol": base * 10000 * scale,
+                    "Total_Txn_Val": base * 50000000 * scale,
                     "Digital_Share": attrs.get("digital_rating", 3) * 20,
                     "Cash_Share": 100 - attrs.get("digital_rating", 3) * 20,
-                    "Total_Cards": attrs.get("branch_count", 1000) * 5000 * scale,
                     "Reporting_Month": month_label,
                     "Month_Num": month_num,
                 })

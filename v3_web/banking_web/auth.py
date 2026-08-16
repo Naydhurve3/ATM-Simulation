@@ -68,6 +68,12 @@ def login():
     session["is_minor"] = bool(result.get("is_minor", False))
     session["age_group"] = result.get("age_group", "Adult")
     session["session_token"] = token
+    try:
+        from banking_core.analytics.activity_tracker import log_activity
+        from banking_core.data.postgres_adapter import get_ecosystem_conn
+        log_activity(get_ecosystem_conn(), result["user_id"], "login")
+    except Exception:
+        pass
     flash(f"Welcome back, {result['name']}!", "success")
     return redirect(url_for("routes.dashboard"))
 
@@ -176,5 +182,11 @@ def register():
     session["is_minor"] = bool(result.get("is_minor", False))
     session["age_group"] = result.get("age_group", "Adult")
     session["session_token"] = token
+    try:
+        from banking_core.analytics.activity_tracker import log_activity
+        from banking_core.data.postgres_adapter import get_ecosystem_conn
+        log_activity(get_ecosystem_conn(), result["user_id"], "register")
+    except Exception:
+        pass
     flash(f"Account created! Welcome, {result['name']}! Your account number is {result.get('account_no', '')}.", "success")
     return redirect(url_for("routes.dashboard"))

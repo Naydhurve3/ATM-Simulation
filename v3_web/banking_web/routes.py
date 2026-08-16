@@ -162,6 +162,34 @@ def _train_report(train_name, fn):
         return train_name, "Failed", str(e)[:80]
 
 
+def _log_activity(activity, amount=0.0, channel="web"):
+    """Append one row to user_activity (never raises)."""
+    try:
+        from banking_core.analytics.activity_tracker import log_activity
+        log_activity(_conn(), session["user_id"], activity, amount, channel)
+    except Exception:
+        pass
+
+
+def _churn_snapshot(force=False):
+    """Stored churn snapshot; recompute+store only on miss or explicit refresh."""
+    uid = session["user_id"]
+    try:
+        from banking_core.analytics.activity_tracker import (
+            build_churn_snapshot, get_churn_snapshot, store_churn_snapshot,
+        )
+        if not force:
+            snap = get_churn_snapshot(uid)
+            if snap:
+                return snap
+        account = _acct()
+        snap = build_churn_snapshot(_conn(), uid, balance=account.balance)
+        store_churn_snapshot(uid, snap)
+        return snap
+    except Exception:
+        return None
+
+
 # ── Index ────────────────────────────────────────────────────
 
 @routes_bp.route("/")
@@ -189,17 +217,8 @@ def dashboard():
     c.execute("SELECT COUNT(*) as n, COALESCE(SUM(amount),0) as tot FROM transactions WHERE user_id=? AND type IN ('withdraw','transfer')", (session["user_id"],))
     spend = dict(zip([d[0] for d in c.description], c.fetchone()))
 
-    churn = None
-    try:
-        from banking_core.models import ChurnPredictor
-        cp = ChurnPredictor()
-        ok, res, _ = _run_model(cp, lambda: cp.predict({
-            "age": feats["age"], "income_bracket": feats["income_bracket"],
-            "balance": account.balance, "txn_count": feats["txn_count"],
-            "days_inactive": feats["days_inactive"]}), cp.train)
-        churn = res if ok else None
-    except Exception:
-        churn = None
+    churn = _churn_snapshot()
+    activity_count = ((churn or {}).get("features") or {}).get("activity_count", 0)
 
     try:
         from banking_core.models.model_monitor import ModelMonitor
@@ -209,7 +228,16 @@ def dashboard():
     except Exception:
         stale = []
     return render_template("dashboard.html", account=account, transactions=transactions,
-                           feats=feats, stats=stats, spend=spend, churn=churn, stale=stale)
+                           feats=feats, stats=stats, spend=spend, churn=churn,
+                           activity_count=activity_count, stale=stale)
+
+
+@routes_bp.route("/dashboard/churn-refresh", methods=["POST"])
+@login_required
+def churn_refresh():
+    _churn_snapshot(force=True)
+    flash("Churn snapshot refreshed from your latest activity", "success")
+    return redirect(url_for("routes.dashboard"))
 
 
 # ── ATM Operations ───────────────────────────────────────────
@@ -241,6 +269,8 @@ def deposit():
             flash(result["error"], "error")
             return render_template("deposit.html", account=account)
         flash(f"Deposited ₹{amount:,.2f}. New balance: ₹{result['balance_after']:,.2f} (+2 credit score)", "success")
+        _log_activity("deposit", amount)
+        _churn_snapshot(force=True)
         return redirect(url_for("routes.balance"))
     return render_template("deposit.html", account=account)
 
@@ -274,6 +304,8 @@ def withdraw():
         denoms = result.get("denominations", {})
         flash(f"Withdrew ₹{amount:,.2f}. Remaining: ₹{result['balance_after']:,.2f} — " +
               " + ".join(f"₹{d}×{n}" for d, n in sorted(denoms.items(), reverse=True)), "success")
+        _log_activity("withdraw", amount)
+        _churn_snapshot(force=True)
         return redirect(url_for("routes.balance"))
     return render_template("withdraw.html", account=account)
 
@@ -298,6 +330,8 @@ def transfer():
             flash(result["error"], "error")
             return render_template("transfer.html", account=account)
         flash(f"Transferred ₹{amount:,.2f} to {target} via {mode.upper()}", "success")
+        _log_activity("transfer", amount, channel="upi" if mode == "upi" else "netbanking")
+        _churn_snapshot(force=True)
         return redirect(url_for("routes.balance"))
     return render_template("transfer.html", account=account)
 

@@ -105,14 +105,20 @@
         <div class="card-head">
             <div>
                 <div class="card-title">Churn Risk Snapshot</div>
-                <div class="card-subtitle">AI prediction based on your activity</div>
+                <div class="card-subtitle">AI prediction based on your activity{% if activity_count %} · {{ activity_count }} actions tracked{% endif %}</div>
             </div>
             <span class="pill {% if churn.risk_level == 'LOW' %}pill--green{% elif churn.risk_level == 'MEDIUM' %}pill--gold{% else %}pill--red{% endif %}">{{ churn.risk_level }}</span>
         </div>
         <div class="gauge-wrap">
             <canvas id="churn-gauge" height="140" data-chart='{"type":"doughnut","labels":["Risk","Headroom"],"datasets":[{"data":[{{ (churn.risk_score or 0) * 100 }},{{ 100 - (churn.risk_score or 0) * 100 }}],"backgroundColor":["{% if churn.risk_level == 'LOW' %}#34d399{% elif churn.risk_level == 'MEDIUM' %}#f59e0b{% else %}#ef4444{% endif %}","#26263a"],"borderWidth":0}]}'></canvas>
-            <span class="gauge-label">{{ churn.method }} · risk score {{ "{:.0%}".format(churn.risk_score or 0) }}</span>
-            <a class="btn btn--ghost btn--sm" href="{{ url_for('routes.ml_churn_analysis') }}">Analyse churn in depth →</a>
+            <span class="gauge-label">{{ churn.method }} · risk score {{ "{:.0%}".format(churn.risk_score or 0) }} · updated {{ churn.updated_at or "just now" }}</span>
+            <div class="flex" style="gap:8px;justify-content:center">
+                <form method="post" action="{{ url_for('routes.churn_refresh') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn--ghost btn--sm" type="submit">↻ Refresh now</button>
+                </form>
+                <a class="btn btn--ghost btn--sm" href="{{ url_for('routes.ml_churn_analysis') }}">Analyse churn in depth →</a>
+            </div>
         </div>
     </div>
     {% endif %}

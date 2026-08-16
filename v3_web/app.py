@@ -93,6 +93,14 @@ def _init_database(db_path: Path):
             rating INTEGER, comments TEXT, category TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS user_activity (
+            activity_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(user_id),
+            activity TEXT NOT NULL,
+            amount REAL DEFAULT 0,
+            channel TEXT DEFAULT 'web',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
     """)
 
     from banking_core.utils import hash_pin

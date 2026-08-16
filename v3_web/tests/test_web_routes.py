@@ -283,3 +283,41 @@ class TestExports:
     def test_export_training_data_zip(self, client, logged_in):
         resp = client.get("/export/training-data")
         assert resp.status_code in (200, 302)
+
+
+class TestChurnSnapshot:
+    def test_dashboard_shows_churn_card(self, client, logged_in):
+        resp = client.get("/dashboard")
+        assert resp.status_code == 200
+        assert b"Churn Risk Snapshot" in resp.data
+        assert b"actions tracked" in resp.data
+        assert b"Refresh now" in resp.data
+
+    def test_churn_refresh_route(self, client, logged_in):
+        token = get_token(client, "/dashboard")
+        resp = client.post("/dashboard/churn-refresh", data={"csrf_token": token},
+                           follow_redirects=True)
+        assert resp.status_code == 200
+        assert b"Churn snapshot refreshed" in resp.data
+
+    def test_activity_logged_on_deposit(self, client, logged_in):
+        post_form(client, "/deposit", {"amount": "1000"})
+        from banking_core.analytics.activity_tracker import activity_features
+        from banking_core.data.postgres_adapter import get_ecosystem_conn
+        uid = _session_user_id(client)
+        feats = activity_features(get_ecosystem_conn(), uid)
+        assert feats["activity_count"] >= 1
+        assert feats["txn_count"] >= 1
+
+    def test_churn_features_refresh_after_action(self, client, logged_in):
+        post_form(client, "/deposit", {"amount": "2000"})
+        token = get_token(client, "/dashboard")
+        client.post("/dashboard/churn-refresh", data={"csrf_token": token})
+        resp = client.get("/dashboard")
+        assert b"Churn Risk Snapshot" in resp.data
+        assert b"txn_count" not in resp.data  # raw features not dumped into HTML
+
+
+def _session_user_id(client):
+    with client.session_transaction() as sess:
+        return sess.get("user_id")

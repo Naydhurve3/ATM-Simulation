@@ -76,3 +76,5 @@ v3_web/banking_core/data/processed/
 v3_web/banking_core/data/models/
 v3_web/banking_core/outputs/
 v3_web/banking_core/logs/
+v3_web/data/
+v3_web/outputs/

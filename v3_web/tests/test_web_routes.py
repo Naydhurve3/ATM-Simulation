@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "v1_banking_core"))
 
 import pytest
 from banking_web import create_app

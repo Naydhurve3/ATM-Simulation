@@ -115,6 +115,38 @@ def _run_model(inst, predict_fn, train_fn=None):
     return False, None, error
 
 
+def _snapshot(name, bank=None, metric=None, kind="json"):
+    """Read a precomputed ML/report snapshot from Neon (None when not in PG mode)."""
+    if not _USE_PG:
+        return None
+    try:
+        from banking_core.data.postgres_adapter import get_ml_snapshot
+        return get_ml_snapshot(name, bank=bank, metric=metric, kind=kind)
+    except Exception:
+        return None
+
+
+def _user_report():
+    """Per-user precomputed report; computes + persists on miss (write-through)."""
+    if not _USE_PG:
+        return None
+    key = f"report_user_{session['user_id']}"
+    rep = _snapshot(key, kind="report")
+    if rep:
+        return rep
+    try:
+        from banking_core.analytics.report_generator import compute_user_report, store_user_report
+        rep = compute_user_report(session["user_id"])
+        if rep:
+            try:
+                store_user_report(session["user_id"], rep)
+            except Exception:
+                pass
+        return rep
+    except Exception:
+        return None
+
+
 def _train_report(train_name, fn):
     try:
         metrics = fn()
@@ -652,6 +684,15 @@ def investment_suggestions():
     suggestions = []
     total_yearly = 0
     error = None
+    if risk == "moderate":
+        rep = _user_report() or {}
+        inv = rep.get("investments")
+        if inv and inv.get("products"):
+            suggestions = [{"category": p.get("name", p.get("category", "Product")), "products": [p],
+                            "total_pct": p.get("allocation_pct", 0)} for p in inv["products"]]
+            total_yearly = inv.get("total_yearly", 0)
+            return render_template("investment.html", suggestions=suggestions, account=account,
+                                   risk=risk, error=error, total_yearly=total_yearly)
     try:
         from banking_core.models.investment_recommender import InvestmentRecommender
         ir = InvestmentRecommender()
@@ -684,16 +725,19 @@ def rfm():
     txns = [dict(zip(cols, r)) for r in c.fetchall()]
     result = None
     error = None
-    try:
-        from banking_core.models import RFMSegmenter
-        rfm = RFMSegmenter()
-        if txns:
-            result = rfm.segment(txns)
-            behavior = rfm.get_segment_behavior(result.get("segment")) if result.get("segment") else None
-            if behavior:
-                result["behavior"] = behavior
-    except Exception as e:
-        error = str(e)
+    rep = _user_report() or {}
+    result = rep.get("rfm")
+    if not result:
+        try:
+            from banking_core.models import RFMSegmenter
+            rfm = RFMSegmenter()
+            if txns:
+                result = rfm.segment(txns)
+                behavior = rfm.get_segment_behavior(result.get("segment")) if result.get("segment") else None
+                if behavior:
+                    result["behavior"] = behavior
+        except Exception as e:
+            error = str(e)
     return render_template("rfm.html", account=account, result=result, error=error, txn_count=len(txns))
 
 
@@ -834,11 +878,14 @@ def growth_rate():
 def user_vs_industry():
     account = _acct()
     comparison = None
-    try:
-        user_data = {"bank": account.bank, "balance": account.balance, "age_group": account.age_group}
-        comparison = _da().user_vs_industry(user_data)
-    except Exception:
-        pass
+    rep = _user_report() or {}
+    comparison = rep.get("user_vs_industry")
+    if not comparison:
+        try:
+            user_data = {"bank": account.bank, "balance": account.balance, "age_group": account.age_group}
+            comparison = _da().user_vs_industry(user_data)
+        except Exception:
+            pass
     return render_template("user_vs_industry.html", account=account, comparison=comparison)
 
 
@@ -927,18 +974,40 @@ def personal_analytics():
 
     forecast = None
     error = None
-    try:
-        from banking_core.models import SpendingForecaster
-        sf = SpendingForecaster()
-        ok, res, err = _run_model(sf, lambda: sf.predict(session["user_id"], {
-            "age": user["age"], "income_bracket": user.get("income_bracket"),
-            "balance": account.balance}), sf.train)
-        forecast = res if ok else None
-        error = err if not ok else None
-    except Exception as e:
-        error = str(e)
+    rep = _user_report() or {}
+    forecast = rep.get("forecast")
+    if not forecast:
+        try:
+            from banking_core.models import SpendingForecaster
+            sf = SpendingForecaster()
+            ok, res, err = _run_model(sf, lambda: sf.predict(session["user_id"], {
+                "age": user["age"], "income_bracket": user.get("income_bracket"),
+                "balance": account.balance}), sf.train)
+            forecast = res if ok else None
+            error = err if not ok else None
+        except Exception as e:
+            error = str(e)
     return render_template("personal_analytics.html", account=account, spend=spend,
                            monthly=monthly, forecast=forecast, error=error)
+
+
+# ── One-Click Analysis Report ───────────────────────────────
+
+@routes_bp.route("/analysis-report")
+@login_required
+def analysis_report():
+    """Instant precomputed report: personal + industry, zero live model training."""
+    account = _acct()
+    rep = _user_report() or {}
+    industry = _snapshot("analysis_report", kind="report") or {}
+    if request.args.get("format") == "json":
+        payload = {"personal": rep, "industry": industry}
+        return Response(
+            json.dumps(payload, default=str),
+            mimetype="application/json",
+            headers={"Content-Disposition": 'attachment; filename="analysis_report.json"'},
+        )
+    return render_template("analysis_report.html", account=account, rep=rep, industry=industry)
 
 
 # ── ML Insights Hub ──────────────────────────────────────────
@@ -959,15 +1028,18 @@ def ml_credit_prediction():
     account = _acct()
     feats = _feature_context()
     prediction = {}
-    try:
-        from banking_core.models import CreditScorer
-        cs = CreditScorer()
-        ok, res, err = _run_model(cs, lambda: cs.predict({
-            "age": feats["age"], "income_bracket": feats["income_bracket"],
-            "balance": account.balance, "txn_count": feats["txn_count"]}), cs.train)
-        prediction = res if ok else {"error": err, "fallback": account.credit_score}
-    except Exception as e:
-        prediction = {"error": str(e), "fallback": account.credit_score}
+    rep = _user_report() or {}
+    prediction = rep.get("credit_ml")
+    if not prediction:
+        try:
+            from banking_core.models import CreditScorer
+            cs = CreditScorer()
+            ok, res, err = _run_model(cs, lambda: cs.predict({
+                "age": feats["age"], "income_bracket": feats["income_bracket"],
+                "balance": account.balance, "txn_count": feats["txn_count"]}), cs.train)
+            prediction = res if ok else {"error": err, "fallback": account.credit_score}
+        except Exception as e:
+            prediction = {"error": str(e), "fallback": account.credit_score}
     return render_template("ml_credit.html", account=account, prediction=prediction, feats=feats)
 
 
@@ -977,16 +1049,19 @@ def ml_churn_analysis():
     account = _acct()
     feats = _feature_context()
     churn = None
-    try:
-        from banking_core.models import ChurnPredictor
-        cp = ChurnPredictor()
-        ok, res, err = _run_model(cp, lambda: cp.predict({
-            "age": feats["age"], "income_bracket": feats["income_bracket"],
-            "balance": account.balance, "txn_count": feats["txn_count"],
-            "days_inactive": feats["days_inactive"]}), cp.train)
-        churn = res if ok else {"error": err}
-    except Exception as e:
-        churn = {"error": str(e)}
+    rep = _user_report() or {}
+    churn = rep.get("churn")
+    if not churn:
+        try:
+            from banking_core.models import ChurnPredictor
+            cp = ChurnPredictor()
+            ok, res, err = _run_model(cp, lambda: cp.predict({
+                "age": feats["age"], "income_bracket": feats["income_bracket"],
+                "balance": account.balance, "txn_count": feats["txn_count"],
+                "days_inactive": feats["days_inactive"]}), cp.train)
+            churn = res if ok else {"error": err}
+        except Exception as e:
+            churn = {"error": str(e)}
     return render_template("ml_churn.html", account=account, churn=churn, feats=feats)
 
 
@@ -1000,6 +1075,15 @@ def ml_loan_default():
     loan_amount = float(request.form.get("amount", 200000)) if request.method == "POST" else 200000
     loan_rate = float(request.form.get("rate", 10.0)) if request.method == "POST" else 10.0
     tenure = int(request.form.get("tenure", 24)) if request.method == "POST" else 24
+    if _USE_PG and request.method == "GET":
+        rep = _user_report() or {}
+        loan = rep.get("loan")
+        if loan and loan.get("result"):
+            default_risk = loan["result"]
+            amortization = None
+            return render_template("ml_loan_default.html", account=account, default_risk=default_risk,
+                                   feats=feats, amortization=amortization, loan_amount=loan_amount,
+                                   loan_rate=loan_rate, tenure=tenure)
     try:
         from banking_core.models import LoanDefaultModel
         lm = LoanDefaultModel()
@@ -1023,15 +1107,20 @@ def ml_bank_recommendation():
     account = _acct()
     feats = _feature_context()
     recommendation = {}
-    try:
-        from banking_core.models import BankRecommender
-        br = BankRecommender()
-        ok, res, err = _run_model(br, lambda: br.recommend({
-            "age": feats["age"], "income_bracket": feats["income_bracket"],
-            "balance": account.balance, "bank": account.bank}, 5), br.train)
-        recommendation = {"banks": res} if ok else {"error": err}
-    except Exception as e:
-        recommendation = {"error": str(e)}
+    rep = _user_report() or {}
+    bankrec = rep.get("bankrec")
+    if bankrec and bankrec.get("banks"):
+        recommendation = {"banks": bankrec["banks"]}
+    else:
+        try:
+            from banking_core.models import BankRecommender
+            br = BankRecommender()
+            ok, res, err = _run_model(br, lambda: br.recommend({
+                "age": feats["age"], "income_bracket": feats["income_bracket"],
+                "balance": account.balance, "bank": account.bank}, 5), br.train)
+            recommendation = {"banks": res} if ok else {"error": err}
+        except Exception as e:
+            recommendation = {"error": str(e)}
     return render_template("ml_bank_rec.html", account=account, recommendation=recommendation, feats=feats)
 
 
@@ -1140,6 +1229,14 @@ def bank_clustering():
     profiles = None
     optimal = None
     error = None
+    if _USE_PG and k == 4:
+        snap = _snapshot("analysis_clustering", kind="report")
+        if snap:
+            profiles = snap.get("profiles")
+            optimal = snap.get("optimal_k")
+            error = snap.get("error")
+            return render_template("ml_clustering.html", profiles=profiles, optimal=optimal,
+                                   error=error, k=k)
     try:
         from banking_core.models import BankClustering
         bc = BankClustering()
@@ -1164,6 +1261,14 @@ def anomaly_detection():
     flagged = None
     monthly = None
     error = None
+    if _USE_PG and contamination == 0.05:
+        snap = _snapshot("analysis_anomaly", kind="report")
+        if snap:
+            flagged = snap.get("flagged")
+            monthly = snap.get("monthly")
+            error = snap.get("error")
+            return render_template("ml_anomaly.html", flagged=flagged, monthly=monthly,
+                                   error=error, contamination=contamination)
     try:
         from banking_core.models import AnomalyDetector
         ad = AnomalyDetector()
@@ -1189,6 +1294,35 @@ def trend_decomposition():
         bank = banks[0] if banks else bank
     components = None
     error = None
+    if _USE_PG:
+        snap = _snapshot("analysis_trend", bank=bank, metric=metric, kind="decompose")
+        if snap and snap.get("components"):
+            return render_template("ml_decomposition.html", banks=banks, bank=bank, metric=metric,
+                                   components=snap["components"], error=None)
+        try:
+            import pandas as pd
+            from banking_core.data.postgres_adapter import get_industry_conn
+            conn = get_industry_conn()
+            df = pd.read_sql("SELECT * FROM atm_card_stats", conn)
+            conn.close()
+            data = df[df["Bank_Name"] == bank][["Reporting_Month", "Month_Num", metric]].sort_values("Month_Num")
+            observed = data[metric].astype(float).tolist()
+            months = data["Reporting_Month"].tolist()
+            trend = data[metric].astype(float).rolling(3, min_periods=1).mean().tolist()
+            components = {
+                "months": [str(m) for m in months],
+                "observed": [round(float(x), 2) if x is not None else None for x in observed],
+                "trend": [None if pd.isna(x) else round(float(x), 2) for x in trend],
+                "seasonal": [None] * len(months),
+                "resid": [round(float(a) - (float(t) if not pd.isna(t) else 0), 2)
+                          for a, t in zip(observed, trend)],
+            }
+            return render_template("ml_decomposition.html", banks=banks, bank=bank, metric=metric,
+                                   components=components, error=None)
+        except Exception as e:
+            error = f"Precomputed decomposition unavailable: {e}"
+            return render_template("ml_decomposition.html", banks=banks, bank=bank, metric=metric,
+                                   components=None, error=error)
     try:
         from banking_core.models import TrendAnalyzer
         ta = TrendAnalyzer()
@@ -1219,6 +1353,12 @@ def channel_migration():
         bank = banks[0] if banks else bank
     prediction = None
     error = None
+    if _USE_PG and months == 6:
+        snap = _snapshot("analysis_migration", bank=bank, kind="predict")
+        if snap and snap.get("prediction"):
+            prediction = snap["prediction"]
+            return render_template("ml_migration.html", banks=banks, bank=bank, months=months,
+                                   prediction=prediction, error=None)
     try:
         from banking_core.models import ChannelMigrationPredictor
         cm = ChannelMigrationPredictor()
@@ -1239,6 +1379,12 @@ def what_if():
     result = None
     error = None
     submitted = request.method == "POST"
+    if _USE_PG and request.method == "GET":
+        snap = _snapshot("analysis_whatif", kind="baseline")
+        if snap:
+            result = snap
+            return render_template("ml_whatif.html", result=result, error=error, changes=changes,
+                                   submitted=False)
     try:
         from banking_core.models import WhatIfSimulator
         ws = WhatIfSimulator()

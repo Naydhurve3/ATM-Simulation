@@ -421,7 +421,8 @@ def get_ml_snapshot(name, bank=None, metric=None, kind="json"):
     cur.execute(
         "SELECT payload FROM ml_snapshots WHERE name=%s AND "
         "((%s::text IS NULL AND bank IS NULL) OR bank=%s) AND "
-        "((%s::text IS NULL AND metric IS NULL) OR metric=%s) AND kind=%s",
+        "((%s::text IS NULL AND metric IS NULL) OR metric=%s) AND kind=%s "
+        "ORDER BY snapshot_id DESC LIMIT 1",
         (name, bank, bank, metric, metric, kind),
     )
     row = cur.fetchone()

@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}Analysis Report{% endblock %}
+{% block content %}
+<style>
+@media print {
+    .sidebar, .topbar, .back-to-top, .cookie-banner, .report-actions { display: none !important; }
+    .main { margin-left: 0 !important; }
+    .content { padding: 0 !important; }
+    .glass-card { break-inside: avoid; }
+    body { background: #fff !important; color: #111 !important; }
+}
+.report-meta { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.6rem; }
+.report-meta .chip { background: var(--card-bg, rgba(255,255,255,0.06)); border: 1px solid var(--border, rgba(255,255,255,0.08)); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.78rem; }
+</style>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Instant Intelligence</span>
+        <h1>Analysis Report</h1>
+        <p class="page-desc">
+            One-click, precomputed summary — your personal banking profile and the full industry picture.
+            No live model training: everything below was calculated once and is served instantly.
+        </p>
+        <div class="report-meta">
+            {% if industry.generated_at %}<span class="chip">Industry data: {{ industry.generated_at[:10] }}</span>{% endif %}
+            {% if rep.generated_at %}<span class="chip">Personal data: {{ rep.generated_at[:10] }}</span>{% endif %}
+            {% if industry.summary and industry.summary.banks %}<span class="chip">{{ industry.summary.banks }} banks · {{ industry.summary.months }} months · {{ industry.summary.rows }} rows</span>{% endif %}
+        </div>
+    </div>
+    <div class="report-actions">
+        <a class="btn btn--ghost" href="{{ url_for('routes.analysis_report', format='json') }}">Download JSON</a>
+        <button class="btn btn--primary" type="button" onclick="window.print()">Print / PDF</button>
+    </div>
+</div>
+
+{% if not rep and not industry.summary %}
+<div class="callout callout--warn">
+    <span class="emoji">⚠️</span>
+    <span>Report snapshots are not available yet. Run <code>python v3_web/scripts/precompute_analysis.py</code> against Neon, or visit any ML page once to generate your personal snapshot.</span>
+</div>
+{% endif %}
+
+<!-- ── Personal ─────────────────────────────────────────── -->
+{% if rep %}
+<h2 class="section-title">Your profile</h2>
+<div class="grid-4">
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Balance</div></div>
+        <div class="stat-number">₹{{ "{:,.0f}".format(rep.stats.total_spent if rep.stats else 0) }}</div>
+        <div class="card-subtitle">total spent</div></div>
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Transactions</div></div>
+        <div class="stat-number">{{ rep.stats.txn_count if rep.stats else 0 }}</div>
+        <div class="card-subtitle">withdrawals + transfers</div></div>
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Avg transaction</div></div>
+        <div class="stat-number">₹{{ "{:,.0f}".format(rep.stats.avg_amount or 0) }}</div>
+        <div class="card-subtitle">recent average</div></div>
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Income</div></div>
+        <div class="stat-number">{{ (rep.profile.income_bracket or "n/a") | replace("_", " ") | title }}</div>
+        <div class="card-subtitle">{{ rep.profile.bank }} · {{ rep.profile.account_type | title }}</div></div>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Credit score</div>
+            <span class="badge badge--{{ 'ok' if rep.credit.rating in ('Excellent','Good') else 'warn' }}">{{ rep.credit.rating }}</span></div>
+        <div class="flex" style="align-items:center; gap:1.2rem">
+            <canvas height="130" data-chart='{"type":"doughnut","labels":["Score","Headroom"],"datasets":[{"data":[{{ rep.credit.total }},{{ 900 - rep.credit.total }}],"backgroundColor":["#818cf8","#26263a"],"borderWidth":0}]}'></canvas>
+            <div style="flex:1">
+                <div class="stat-number" style="font-size:2rem">{{ rep.credit.total }}<span style="font-size:0.9rem;color:var(--muted,#8b8b93)"> / 900</span></div>
+                {% for k, v in rep.credit.breakdown.items() if k != "total" %}
+                <div class="detail-item"><span class="k">{{ k | title }}</span><span class="v">{{ "%+d" | format(v) if v is number else v }}</span></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Churn risk</div></div>
+        <div class="flex" style="align-items:center; gap:1.2rem">
+            <canvas height="130" data-chart='{"type":"doughnut","labels":["Risk","Headroom"],"datasets":[{"data":[{{ (rep.churn.risk_score or 0) * 100 }},{{ 100 - (rep.churn.risk_score or 0) * 100 }}],"backgroundColor":["{% if rep.churn.risk_level == 'LOW' %}#34d399{% elif rep.churn.risk_level == 'MEDIUM' %}#f59e0b{% else %}#ef4444{% endif %}","#26263a"],"borderWidth":0}]}'></canvas>
+            <div style="flex:1">
+                <div class="stat-number" style="font-size:2rem">{{ rep.churn.risk_level }}</div>
+                <div class="card-subtitle">{{ rep.churn.method or "model" }} · score {{ rep.churn.risk_score }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Loan eligibility</div></div>
+        {% if rep.loan.result %}
+        <div class="detail-list">
+            <div class="detail-item"><span class="k">Eligible</span><span class="v">{{ "Yes" if rep.loan.result.eligible else "No" }}</span></div>
+            <div class="detail-item"><span class="k">Risk</span><span class="v">{{ rep.loan.result.risk_level }} ({{ rep.loan.result.risk_score }})</span></div>
+            <div class="detail-item"><span class="k">Recommended max</span><span class="v">₹{{ "{:,.0f}".format(rep.loan.result.recommended_max or 0) }}</span></div>
+            <div class="detail-item"><span class="k">EMI (₹2L · 10% · 24 mo)</span><span class="v">₹{{ "{:,.0f}".format(rep.loan.emi or 0) }}</span></div>
+            <div class="detail-item"><span class="k">Total repayment</span><span class="v">₹{{ "{:,.0f}".format(rep.loan.total_payment or 0) }}</span></div>
+        </div>
+        {% else %}<div class="card-subtitle">No loan snapshot available.</div>{% endif %}
+    </div>
+
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">RFM segment</div></div>
+        {% if rep.rfm %}
+        <div class="detail-list">
+            <div class="detail-item"><span class="k">Segment</span><span class="v">{{ rep.rfm.segment }}</span></div>
+            <div class="detail-item"><span class="k">Score</span><span class="v">{{ rep.rfm.total_score }}</span></div>
+            <div class="detail-item"><span class="k">Recommendation</span><span class="v">{{ rep.rfm.recommendation }}</span></div>
+        </div>
+        <p class="mt-1" style="color:var(--muted,#8b8b93);font-size:0.85rem">{{ rep.rfm.behavior }}</p>
+        {% else %}<div class="card-subtitle">No RFM snapshot available.</div>{% endif %}
+    </div>
+</div>
+
+{% if rep.investments and rep.investments.products %}
+<div class="grid-2">
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Investment allocation</div></div>
+        <canvas height="220" data-chart='{"type":"doughnut","labels":{{ rep.investments.products | map(attribute="category") | list | tojson }},"datasets":[{"data":{{ rep.investments.products | map(attribute="allocation_pct") | list | tojson }},"borderWidth":0}]}'></canvas>
+    </div>
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Spending forecast</div></div>
+        {% if rep.forecast and rep.forecast.predicted_monthly_spend %}
+        <div class="detail-list">
+            <div class="detail-item"><span class="k">Next month spend</span><span class="v">₹{{ "{:,.0f}".format(rep.forecast.predicted_monthly_spend) }}</span></div>
+            <div class="detail-item"><span class="k">Next month deposit</span><span class="v">₹{{ "{:,.0f}".format(rep.forecast.predicted_monthly_deposit) }}</span></div>
+            <div class="detail-item"><span class="k">Trend</span><span class="v">{{ rep.forecast.trend }}</span></div>
+            <div class="detail-item"><span class="k">Confidence</span><span class="v">{{ rep.forecast.confidence }}</span></div>
+        </div>
+        {% else %}<div class="card-subtitle">No forecast snapshot available.</div>{% endif %}
+        {% if rep.user_vs_industry %}
+        <div class="callout callout--info mt-1">
+            <span class="emoji">⚖️</span>
+            <span>{{ rep.profile.bank }} digital share <strong>{{ rep.user_vs_industry.bank_digital_share }}%</strong>
+            vs industry {{ rep.user_vs_industry.industry_avg_digital }}%
+            ({{ "above" if rep.user_vs_industry.above_industry else "below" }} industry)</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if rep.savings and rep.savings.suggestions %}
+<div class="glass-card reveal in">
+    <div class="card-head"><div class="card-title">Savings plan</div>
+        <div class="card-subtitle">₹{{ "{:,.0f}".format(rep.savings.total_current) }} of ₹{{ "{:,.0f}".format(rep.savings.total_target) }}</div></div>
+    {% for g in rep.savings.suggestions %}
+    <div class="goal-card">
+        <div class="flex" style="justify-content:space-between">
+            <span class="goal-name">{{ g.goal_name }}</span>
+            <span class="card-subtitle">₹{{ "{:,.0f}".format(g.suggested_monthly) }}/mo</span>
+        </div>
+        <div class="progress"><div class="progress__bar" style="width:{{ [g.progress, 100] | min }}%"></div></div>
+        <div class="card-subtitle">{{ g.progress }}% · {{ g.months_left }} months left · ₹{{ "{:,.0f}".format(g.current_amount) }} / ₹{{ "{:,.0f}".format(g.target_amount) }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+<!-- ── Industry ─────────────────────────────────────────── -->
+{% if industry.summary %}
+<h2 class="section-title">Industry pulse</h2>
+<div class="grid-4">
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Banks tracked</div></div>
+        <div class="stat-number">{{ industry.summary.banks }}</div></div>
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Months</div></div>
+        <div class="stat-number">{{ industry.summary.months }}</div></div>
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Records</div></div>
+        <div class="stat-number">{{ industry.summary.rows }}</div></div>
+    <div class="glass-card reveal in"><div class="card-head"><div class="card-title">Largest</div></div>
+        <div class="stat-number" style="font-size:1.05rem">{{ industry.summary.top_banks[0] }}</div></div>
+</div>
+{% endif %}
+
+{% if industry.market_share %}
+<div class="grid-2">
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Market share (ATM cash volume)</div></div>
+        <canvas height="240" data-chart='{"type":"doughnut","labels":{{ industry.market_share.labels | tojson }},"datasets":[{"data":{{ industry.market_share["values"] | tojson }},"borderWidth":0}]}'></canvas>
+    </div>
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Channel mix</div></div>
+        <canvas height="240" data-chart='{"type":"bar","labels":{{ industry.channel_breakdown.labels | tojson }},"datasets":[{"label":"Volume","data":{{ industry.channel_breakdown["values"] | tojson }},"backgroundColor":"#818cf8","borderRadius":6}]}'></canvas>
+    </div>
+</div>
+{% endif %}
+
+{% if industry.trend %}
+<div class="glass-card reveal in">
+    <div class="card-head"><div class="card-title">Trend decomposition — {{ industry.trend[0].metric }}</div>
+        <div class="card-subtitle">observed vs trend (top banks)</div></div>
+    {% for t in industry.trend %}
+    <div class="mt-1"><div class="card-subtitle">{{ t.bank }}</div>
+        <canvas height="160" data-chart='{"type":"line","labels":{{ t.components.months | tojson }},"datasets":[{"label":"Observed","data":{{ t.components.observed | tojson }},"borderColor":"#818cf8","backgroundColor":"rgba(129,140,248,0.08)","fill":true,"tension":0.3},{"label":"Trend","data":{{ t.components.trend | tojson }},"borderColor":"#34d399","backgroundColor":"transparent","tension":0.3}]}'></canvas>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if industry.clustering %}
+<div class="grid-2">
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Bank clusters (k-means)</div>
+            <div class="card-subtitle">k = {{ industry.clustering.profiles | length if industry.clustering.profiles else 4 }}{% if industry.clustering.optimal_k %} · optimal k = {{ industry.clustering.optimal_k }}{% endif %}</div></div>
+        {% for cidx, cluster in (industry.clustering.profiles or {}).items() %}
+        <div class="goal-card">
+            <div class="flex" style="justify-content:space-between">
+                <span class="goal-name">Cluster {{ cidx }}</span>
+            </div>
+            <div class="detail-list mt-1">
+                {% for key, val in cluster.items() if val is not mapping and val is not sequence %}
+                <div class="detail-item"><span class="k">{{ key | replace('_', ' ') | title }}</span><span class="v">{{ "%.2f" | format(val) if val is number else val }}</span></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Anomaly watch</div></div>
+        {% if industry.anomaly and industry.anomaly.flagged %}
+        <div class="detail-list">
+            {% for f in industry.anomaly.flagged %}
+            <div class="detail-item"><span class="k">{{ f.get("Bank_Name", f.get("bank", "Bank")) }}</span><span class="v">{{ f.get("anomaly_score", f.get("score", "")) }}</span></div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card-subtitle">No anomalous banks flagged in the current window.</div>
+        {% endif %}
+        {% if industry.replenishment %}
+        <div class="card-head mt-1"><div class="card-title">Replenishment (₹1L demand)</div></div>
+        <div class="detail-list">
+            <div class="detail-item"><span class="k">Best strategy</span><span class="v">{{ industry.replenishment.best_strategy }}</span></div>
+            {% for s in (industry.replenishment.comparison or [])[:4] %}
+            <div class="detail-item"><span class="k">{{ s.get("strategy", "Strategy") }}</span><span class="v">{{ s.get("total_cost", s.get("cost", "")) }}</span></div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if industry.migration %}
+<div class="grid-2">
+    {% for m in industry.migration %}
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">Channel migration — {{ m.bank }}</div>
+            <div class="card-subtitle">{{ m.months }} months ahead</div></div>
+        <div class="detail-list">
+            {% for key, val in m.prediction.items() if val is not mapping and val is not sequence %}
+            <div class="detail-item"><span class="k">{{ key | replace('_', ' ') | title }}</span><span class="v">{{ "%.2f" | format(val) if val is number else val }}</span></div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">What-if baseline</div></div>
+        {% if industry.whatif and not industry.whatif.error %}
+        <div class="detail-list">
+            <div class="detail-item"><span class="k">Impact target</span><span class="v">{{ industry.whatif.predicted_impact_on }}</span></div>
+            <div class="detail-item"><span class="k">Current impact</span><span class="v">₹{{ "{:,.2f}".format(industry.whatif.estimated_change or 0) }}</span></div>
+        </div>
+        {% else %}<div class="card-subtitle">No what-if baseline.</div>{% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if industry.correlation %}
+<div class="glass-card reveal in">
+    <div class="card-head"><div class="card-title">Correlation matrix (first 6 metrics)</div>
+        <a class="btn btn--ghost btn--sm" href="{{ url_for('routes.correlation') }}">Full matrix</a></div>
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th></th>
+                {% for l in industry.correlation.labels[:6] %}<th>{{ l }}</th>{% endfor %}</tr></thead>
+            <tbody>
+                {% for r in range([6, industry.correlation.matrix | length] | min) %}
+                <tr><td><strong>{{ industry.correlation.labels[r] }}</strong></td>
+                    {% for c in range([6, industry.correlation.labels | length] | min) %}
+                    <td>{{ industry.correlation.matrix[r][c] if industry.correlation.matrix[r][c] is number else "" }}</td>
+                    {% endfor %}</tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% if industry.growth %}
+<div class="glass-card reveal in">
+    <div class="card-head"><div class="card-title">Industry growth (MoM, %)</div></div>
+    <canvas height="200" data-chart='{"type":"line","labels":{{ industry.growth.months | tojson }},"datasets":[{"label":"MoM growth %","data":{{ industry.growth["values"] | tojson }},"borderColor":"#f59e0b","backgroundColor":"transparent","tension":0.3}]}'></canvas>
+</div>
+{% endif %}
+
+{% if industry.overviews %}
+<h2 class="section-title">Top bank snapshots</h2>
+<div class="grid-3">
+    {% for ov in industry.overviews %}
+    <div class="glass-card reveal in">
+        <div class="card-head"><div class="card-title">{{ ov.Bank }}</div><div class="card-subtitle">{{ ov.Type }}</div></div>
+        <div class="detail-list">
+            {% for key, val in ov.items() if key not in ("Bank", "Type") %}
+            <div class="detail-item"><span class="k">{{ key }}</span><span class="v">{{ "{:,.0f}".format(val) if val is number else val }}</span></div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

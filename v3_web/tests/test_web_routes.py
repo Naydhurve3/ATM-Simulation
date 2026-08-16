@@ -150,6 +150,7 @@ class TestProtectedPages:
             "/ml/bank-clustering", "/ml/anomaly-detection", "/ml/trend-decomposition",
             "/ml/channel-migration", "/ml/what-if", "/ml/replenishment",
             "/ml/lstm-vs-prophet", "/ml/retrain-all",
+            "/analysis-report",
         ]
         for path in paths:
             resp = client.get(path)
@@ -249,6 +250,23 @@ class TestFeatureFlows:
         resp = post_form(client, "/ml/what-if",
                          {"Total_ATMs": "1500", "Digital_Share": "60"})
         assert resp.status_code == 200
+
+
+class TestAnalysisReport:
+    def test_requires_login(self, client):
+        resp = client.get("/analysis-report")
+        assert resp.status_code == 302
+
+    def test_renders(self, client, logged_in):
+        resp = client.get("/analysis-report")
+        assert resp.status_code == 200
+        assert b"Analysis Report" in resp.data
+        assert b"Instant Intelligence" in resp.data
+
+    def test_json_export(self, client, logged_in):
+        resp = client.get("/analysis-report?format=json")
+        assert resp.status_code == 200
+        assert resp.mimetype == "application/json"
 
 
 class TestExports:

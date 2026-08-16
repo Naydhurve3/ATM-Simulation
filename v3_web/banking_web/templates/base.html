@@ -27,6 +27,7 @@
 {% if session.get('user_id') %}
 {% set endpoints = {
     'routes.dashboard': ('🏠', 'Dashboard'),
+    'routes.analysis_report': ('📊', 'Analysis Report'),
     'routes.balance': ('💳', 'Balance'),
     'routes.deposit': ('📥', 'Deposit'),
     'routes.withdraw': ('📤', 'Withdraw'),
@@ -76,6 +77,7 @@
 } %}
 {% set groups = [
     ('Overview', ['routes.dashboard']),
+    ('Report', ['routes.analysis_report']),
     ('Account', ['routes.balance', 'routes.deposit', 'routes.withdraw', 'routes.transfer', 'routes.statement', 'routes.profile', 'routes.change_pin']),
     ('Analytics', ['routes.analytics', 'routes.monthly_trend', 'routes.channel_breakdown', 'routes.market_share', 'routes.growth_rate', 'routes.user_vs_industry', 'routes.bank_overview', 'routes.bank_compare', 'routes.correlation', 'routes.personal_analytics']),
     ('ML Lab', ['routes.ml_credit_prediction', 'routes.ml_churn_analysis', 'routes.ml_loan_default', 'routes.ml_bank_recommendation', 'routes.cash_demand', 'routes.txn_volume', 'routes.bank_clustering', 'routes.anomaly_detection', 'routes.trend_decomposition', 'routes.channel_migration', 'routes.what_if', 'routes.replenishment', 'routes.lstm_vs_prophet', 'routes.retrain_all']),

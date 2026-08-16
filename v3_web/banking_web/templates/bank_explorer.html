@@ -1,22 +1,57 @@
 {% extends "base.html" %}
-{% block title %}Bank Explorer - ATM Banking{% endblock %}
+{% block title %}Bank Explorer — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#127974;</div><h1>BANK EXPLORER</h1></div><p class="subtitle">Banks in our network</p></div>
-  {% if banks %}<div class="txn-list">{% for b in banks %}
-    <div class="txn-item">
-      <div class="txn-info"><span class="txn-type">{{ b.bank }}</span><span class="txn-date">{{ b.cnt }} account{% if b.cnt > 1 %}s{% endif %}</span></div>
-      <div style="font-size:13px;color:#4fc3f7;">Avg: &#8377; {{ '%.0f'|format(b.avg_bal or 0) }}</div>
-    </div>{% endfor %}</div>
-  {% else %}<div class="empty-state"><p>No banks registered yet.</p></div>{% endif %}
-  {% if bank_attrs %}<div class="recent-txns" style="margin-top:16px;"><h3>Bank Attributes</h3><div class="txn-list">{% for a in bank_attrs %}
-    <div class="txn-item">
-      <div class="txn-info"><span class="txn-type">{{ a.name }}</span></div>
-      <div style="text-align:right;font-size:11px;color:#667788;">
-        {% if a.savings_rate %}Rate: {{ a.savings_rate }}%{% endif %}
-        {% if a.atm_fee_own %}Fee: &#8377;{{ a.atm_fee_own }}{% endif %}
-      </div>
-    </div>{% endfor %}</div></div>
-  {% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Market Intelligence</span>
+        <h1>Bank Explorer</h1>
+        <p class="page-desc">{{ total }} banks in the ecosystem — explore their ATM rules and identity prefixes.</p>
+    </div>
+    {% if random_bank %}
+    <a class="btn btn--primary" href="{{ url_for('routes.bank_explorer', random='1') }}">🎲 Random bank</a>
+    {% endif %}
+</div>
+
+<form class="glass-card reveal" method="get" action="{{ url_for('routes.bank_explorer') }}">
+    <div class="flex flex-wrap">
+        <input class="form-control" type="search" name="q" value="{{ q }}" placeholder="Search banks…">
+        <select class="form-control" name="cat" style="max-width:180px">
+            <option value="all">All types</option>
+            {% for cat in ['PSU', 'PVT', 'FOREIGN', 'COOP', 'RRB', 'PAY', 'SFB'] %}
+            <option value="{{ cat }}" {% if category == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn--primary" type="submit">Filter</button>
+    </div>
+</form>
+
+<div class="bank-grid mt-2">
+    {% for b in banks %}
+    <div class="glass-card bank-card-sm reveal">
+        <div class="flex" style="justify-content:space-between;align-items:flex-start">
+            <span class="bank-name">{{ b.name }}</span>
+            <span class="pill {% if b.type == 'PSU' %}pill--green{% elif b.type == 'PVT' %}pill--accent{% elif b.type == 'FOREIGN' %}pill--info{% else %}pill--gold{% endif %}">{{ b.type }}</span>
+        </div>
+        <div class="detail-list mt-1">
+            <div class="detail-item"><span class="k">Prefix</span><span class="v mono">{{ b.prefix }}</span></div>
+            <div class="detail-item"><span class="k">Acc. no length</span><span class="v">{{ b.account_no_length }}</span></div>
+            <div class="detail-item"><span class="k">Card no length</span><span class="v">{{ b.card_no_length }}</span></div>
+            <div class="detail-item"><span class="k">Daily limit</span><span class="v">₹{{ "{:,.0f}".format(b.atm_daily_limit) }}</span></div>
+            <div class="detail-item"><span class="k">Base score</span><span class="v">{{ b.base_credit_score }}</span></div>
+        </div>
+    </div>
+    {% else %}
+    <div class="glass-card" style="grid-column:1/-1">
+        <div class="empty-state"><div class="empty-icon">🏦</div><p>No banks match your filters</p></div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if pages > 1 %}
+<div class="pagination mt-2">
+    {% for p in range(1, pages + 1) %}
+    <a class="pagination__item {% if p == page %}pagination__item--active{% endif %}" href="{{ url_for('routes.bank_explorer', page=p, cat=category, q=q) }}">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

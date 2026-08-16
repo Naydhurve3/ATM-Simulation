@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}What-If Simulator — ML Lab{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Industry Models</span>
+        <h1>What-If Simulator</h1>
+        <p class="page-desc">Change network parameters and see the projected impact on volumes.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.what_if') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">Simulation parameters</div>
+            <div class="card-subtitle">Leave empty to keep current value</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="Total_ATMs">Total ATMs</label>
+            <input class="form-control" type="number" name="Total_ATMs" id="Total_ATMs" value="{{ changes.get('Total_ATMs', '') }}" placeholder="e.g. 1500">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="PoS">PoS terminals</label>
+            <input class="form-control" type="number" name="PoS" id="PoS" value="{{ changes.get('PoS', '') }}" placeholder="e.g. 75000">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="Digital_Share">Digital share (%)</label>
+            <input class="form-control" type="number" name="Digital_Share" id="Digital_Share" min="0" max="100" value="{{ changes.get('Digital_Share', '') }}" placeholder="e.g. 60">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="Total_Cards">Total cards</label>
+            <input class="form-control" type="number" name="Total_Cards" id="Total_Cards" value="{{ changes.get('Total_Cards', '') }}" placeholder="e.g. 4000000">
+        </div>
+        <button class="btn btn--primary" type="submit">Simulate</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Simulation result</div>
+            <div class="card-subtitle">{{ changes | length }} parameter(s) changed</div>
+        </div>
+        {% if result %}
+        <div class="stat-grid">
+            {% for k, v in result.items() if v is not mapping and v is not sequence %}
+            <div class="glass-card stat-card stat-card--green">
+                <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+                <span class="stat-value" style="font-size:1rem">{{ "%.0f" | format(v) if v is number else v }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif error %}
+        <div class="callout callout--warn">
+            <span class="emoji">⚠️</span>
+            <span>{{ error }}</span>
+        </div>
+        {% elif not submitted %}
+        <div class="empty-state"><div class="empty-icon">🔮</div><p>Adjust parameters and hit Simulate</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

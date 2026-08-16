@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}RFM Segmentation — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">AI Analytics</span>
+        <h1>RFM Segmentation</h1>
+        <p class="page-desc">Recency · Frequency · Monetary — where does your banking behaviour sit?</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="callout callout--warn reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ error }}</span>
+</div>
+{% endif %}
+
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--accent reveal">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-label">Your segment</span>
+        <span class="stat-value" style="font-size:1.15rem">{{ (result.segment if result else '—') | replace('_', ' ') | title }}</span>
+        <span class="stat-sub">{{ txn_count }} transactions analysed · score {{ result.total_score if result else '—' }}/15</span>
+    </div>
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">⏰</span>
+        <span class="stat-label">Recency score</span>
+        <span class="stat-value">{{ result.rfm_score.R if result else '—' }}</span>
+        <span class="stat-sub">out of 5</span>
+    </div>
+    <div class="glass-card stat-card stat-card--gold reveal">
+        <span class="stat-icon">🔁</span>
+        <span class="stat-label">Frequency score</span>
+        <span class="stat-value">{{ result.rfm_score.F if result else '—' }}</span>
+        <span class="stat-sub">out of 5</span>
+    </div>
+    <div class="glass-card stat-card stat-card--green reveal">
+        <span class="stat-icon">💰</span>
+        <span class="stat-label">Monetary score</span>
+        <span class="stat-value">{{ result.rfm_score.M if result else '—' }}</span>
+        <span class="stat-sub">out of 5</span>
+    </div>
+</div>
+
+{% if result %}
+<div class="grid-2 mt-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">AI recommendation</div>
+            <div class="card-subtitle">What the model suggests for your segment</div>
+        </div>
+        <p style="opacity:.85">{{ result.recommendation }}</p>
+    </div>
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Segment behaviour profile</div>
+            <div class="card-subtitle">What this segment means</div>
+        </div>
+        <p style="opacity:.85">{{ result.behavior if result.behavior is defined else '' }}</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,53 +1,138 @@
 {% extends "base.html" %}
-{% block title %}Dashboard - ATM Banking{% endblock %}
+{% block title %}Dashboard — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-    <div class="atm-header">
-        <div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>WELCOME</h1></div>
-        <p class="subtitle">{{ account.name }} | {{ account.bank }}</p>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Personal Banking</span>
+        <h1>Welcome back, <span>{{ account.name.split() | first }}</span> 👋</h1>
+        <p class="page-desc">Your financial command centre — balance, analytics and AI insights in one place.</p>
+    </div>
+    <div class="flex flex-wrap">
+        <a class="btn btn--primary" href="{{ url_for('routes.deposit') }}">+ Deposit</a>
+        <a class="btn" href="{{ url_for('routes.withdraw') }}">− Withdraw</a>
+        <a class="btn btn--ghost" href="{{ url_for('routes.transfer') }}">Transfer</a>
+    </div>
+</div>
+
+{% if stale %}
+<div class="callout callout--warn mb-2">
+    <span class="emoji">🔄</span>
+    <span><strong>{{ stale | length }} model(s) stale</strong> — {{ stale | join(', ') }} need retraining.
+        <a href="{{ url_for('routes.retrain_all') }}" style="color:var(--accent);font-weight:600">Retrain now</a></span>
+</div>
+{% endif %}
+
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--accent reveal">
+        <span class="stat-icon">₹</span>
+        <span class="stat-label">Available Balance</span>
+        <span class="stat-value"><span data-countup="{{ account.balance }}" data-decimals="2">0</span></span>
+        <span class="stat-sub">{{ account.bank }} · {{ account.account_type | replace('_', ' ') | title }}</span>
+    </div>
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">📈</span>
+        <span class="stat-label">Total Deposits</span>
+        <span class="stat-value"><span data-countup="{{ stats.tot }}">0</span></span>
+        <span class="stat-sub">{{ stats.n }} deposit transactions</span>
+    </div>
+    <div class="glass-card stat-card stat-card--gold reveal">
+        <span class="stat-icon">💸</span>
+        <span class="stat-label">Total Spent</span>
+        <span class="stat-value"><span data-countup="{{ spend.tot }}">0</span></span>
+        <span class="stat-sub">{{ spend.n }} withdrawals &amp; transfers</span>
+    </div>
+    <div class="glass-card stat-card stat-card--green reveal">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-label">Credit Score</span>
+        <span class="stat-value"><span data-countup="{{ account.credit_score }}">0</span></span>
+        <span class="stat-sub">
+            {% if account.credit_score >= 750 %}Excellent{% elif account.credit_score >= 650 %}Good{% elif account.credit_score >= 550 %}Fair{% else %}Needs attention{% endif %}
+        </span>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div>
+                <div class="card-title">Account Overview</div>
+                <div class="card-subtitle">ATM rules: daily limit ₹{{ "{:,.0f}".format(account.daily_limit) }} · used today ₹{{ "{:,.0f}".format(account.used_today) }}</div>
+            </div>
+            <span class="pill pill--accent">{{ account.age_group }}</span>
+        </div>
+        <div class="detail-list">
+            <div class="detail-item"><span class="k">Account No</span><span class="v mono">{{ account.account_number }}</span></div>
+            <div class="detail-item"><span class="k">Card No</span><span class="v mono">{{ account.card_number }}</span></div>
+            <div class="detail-item"><span class="k">Bank</span><span class="v">{{ account.bank }}</span></div>
+            <div class="detail-item"><span class="k">Account Type</span><span class="v">{{ account.account_type | replace('_', ' ') | title }}</span></div>
+            <div class="detail-item"><span class="k">Daily Limit Used</span><span class="v">{{ "{:.0f}".format(account.used_today / account.daily_limit * 100 if account.daily_limit else 0) }}%</span></div>
+            <div class="detail-item"><span class="k">Transactions</span><span class="v">{{ feats.txn_count }}</span></div>
+        </div>
+        <div class="progress mt-2"><div class="progress__bar{% if account.daily_limit and account.used_today / account.daily_limit > 0.8 %}--red{% endif %}" style="width:{{ (account.used_today / account.daily_limit * 100) if account.daily_limit else 0 }}%"></div></div>
     </div>
 
-    <div class="balance-card">
-        <div class="balance-label">Available Balance</div>
-        <div class="balance-amount">&#8377; {{ "%.2f"|format(account.balance) }}</div>
-        <div class="balance-acct">A/C {{ account.account_number }} | Score: {{ account.credit_score }}</div>
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div>
+                <div class="card-title">Recent Activity</div>
+                <div class="card-subtitle">Last 8 transactions</div>
+            </div>
+            <a class="btn btn--ghost btn--sm" href="{{ url_for('routes.statement') }}">Full statement</a>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>When</th><th>Type</th><th>Amount</th><th>Balance</th></tr></thead>
+                <tbody>
+                    {% for t in transactions %}
+                    <tr>
+                        <td class="mono small">{{ t.timestamp[:16] }}</td>
+                        <td><span class="badge {% if t.type in ('deposit','credit') %}badge--success{% else %}badge--warn{% endif %}">{{ t.type | replace('_',' ') }}</span></td>
+                        <td class="num {{ 'pos' if t.type in ('deposit','credit') else 'neg' }}">{{ "+" if t.type in ('deposit','credit') else "−" }}₹{{ "{:,.2f}".format(t.amount) }}</td>
+                        <td class="num">₹{{ "{:,.2f}".format(t.balance_after) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4"><div class="empty-state"><div class="empty-icon">🧾</div><p>No transactions yet — make your first deposit!</p></div></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+</div>
 
-    <div class="action-grid">
-        <a href="{{ url_for('routes.deposit') }}" class="action-btn"><span class="action-icon">+</span><span>Deposit</span></a>
-        <a href="{{ url_for('routes.withdraw') }}" class="action-btn"><span class="action-icon">-</span><span>Withdraw</span></a>
-        <a href="{{ url_for('routes.transfer') }}" class="action-btn"><span class="action-icon">&#8594;</span><span>Transfer</span></a>
-        <a href="{{ url_for('routes.statement') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Statement</span></a>
-        <a href="{{ url_for('routes.profile') }}" class="action-btn"><span class="action-icon">&#9787;</span><span>Profile</span></a>
-        <a href="{{ url_for('routes.credit_score') }}" class="action-btn"><span class="action-icon">&#9733;</span><span>Credit Score</span></a>
-        <a href="{{ url_for('routes.savings') }}" class="action-btn"><span class="action-icon">&#9733;</span><span>Savings</span></a>
-        <a href="{{ url_for('routes.loans') }}" class="action-btn"><span class="action-icon">&#8364;</span><span>Loans</span></a>
-        <a href="{{ url_for('routes.security') }}" class="action-btn"><span class="action-icon">&#9888;</span><span>Security</span></a>
-        <a href="{{ url_for('routes.investment_suggestions') }}" class="action-btn"><span class="action-icon">&#9733;</span><span>Invest</span></a>
-        <a href="{{ url_for('routes.analytics') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Analytics</span></a>
-        <a href="{{ url_for('routes.reports') }}" class="action-btn"><span class="action-icon">&#8681;</span><span>Reports</span></a>
-        <a href="{{ url_for('routes.bank_explorer') }}" class="action-btn"><span class="action-icon">&#127974;</span><span>Banks</span></a>
-        <a href="{{ url_for('routes.insights') }}" class="action-btn"><span class="action-icon">&#9881;</span><span>ML Insights</span></a>
-        <a href="{{ url_for('routes.monitoring') }}" class="action-btn"><span class="action-icon">&#10064;</span><span>Monitoring</span></a>
-        <a href="{{ url_for('routes.feedback') }}" class="action-btn"><span class="action-icon">&#9993;</span><span>Feedback</span></a>
-    </div>
-
-    {% if transactions %}
-    <div class="recent-txns">
-        <h3>Recent Transactions</h3>
-        <div class="txn-list">{% for txn in transactions %}
-            <div class="txn-item">
-                <div class="txn-info"><span class="txn-type">{{ txn.type }}</span><span class="txn-date">{{ txn.timestamp[:10] }}</span></div>
-                <span class="txn-amount {% if txn.type in ('deposit','credit') %}positive{% else %}negative{% endif %}">
-                    {% if txn.type in ('deposit','credit') %}+{% else %}-{% endif %}&#8377; {{ "%.2f"|format(txn.amount) }}
-                </span>
-            </div>{% endfor %}
+<div class="grid-2 mt-2">
+    {% if churn %}
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div>
+                <div class="card-title">Churn Risk Snapshot</div>
+                <div class="card-subtitle">AI prediction based on your activity</div>
+            </div>
+            <span class="pill {% if churn.risk_level == 'LOW' %}pill--green{% elif churn.risk_level == 'MEDIUM' %}pill--gold{% else %}pill--red{% endif %}">{{ churn.risk_level }}</span>
+        </div>
+        <div class="gauge-wrap">
+            <canvas id="churn-gauge" height="140" data-chart='{"type":"doughnut","labels":["Risk","Headroom"],"datasets":[{"data":[{{ (churn.risk_score or 0) * 100 }},{{ 100 - (churn.risk_score or 0) * 100 }}],"backgroundColor":["{% if churn.risk_level == 'LOW' %}#34d399{% elif churn.risk_level == 'MEDIUM' %}#f59e0b{% else %}#ef4444{% endif %}","#26263a"],"borderWidth":0}]}'></canvas>
+            <span class="gauge-label">{{ churn.method }} · risk score {{ "{:.0%}".format(churn.risk_score or 0) }}</span>
+            <a class="btn btn--ghost btn--sm" href="{{ url_for('routes.ml_churn_analysis') }}">Analyse churn in depth →</a>
         </div>
     </div>
     {% endif %}
-
-    <div class="atm-footer-links">
-        <a href="{{ url_for('auth.logout') }}" class="logout-link">Logout</a>
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div>
+                <div class="card-title">Quick Insights</div>
+                <div class="card-subtitle">Shortcuts to your most-used tools</div>
+            </div>
+        </div>
+        <div class="flex flex-wrap">
+            <a class="pill pill--accent" href="{{ url_for('routes.credit_score') }}">🎯 Credit score</a>
+            <a class="pill pill--green" href="{{ url_for('routes.savings') }}">🐷 Savings goals</a>
+            <a class="pill pill--gold" href="{{ url_for('routes.loans') }}">🏗️ Loan offers</a>
+            <a class="pill pill--info" href="{{ url_for('routes.personal_analytics') }}">🧬 Spend forecast</a>
+            <a class="pill pill--purple" href="{{ url_for('routes.ml_bank_recommendation') }}">⭐ Bank recommendation</a>
+            <a class="pill" href="{{ url_for('routes.security') }}">🛡️ Security centre</a>
+            <a class="pill" href="{{ url_for('routes.analytics') }}">📊 Analytics</a>
+            <a class="pill" href="{{ url_for('routes.insights') }}">🤖 ML insights</a>
+        </div>
     </div>
 </div>
 {% endblock %}

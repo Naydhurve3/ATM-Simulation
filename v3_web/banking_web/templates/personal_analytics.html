@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Personal Analytics — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>Personal Analytics</h1>
+        <p class="page-desc">Your spending pattern, monthly trend and an ML spend forecast.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--gold reveal">
+        <span class="stat-icon">💸</span>
+        <span class="stat-label">Total spent</span>
+        <span class="stat-value">₹{{ "{:,.0f}".format(spend.tot) }}</span>
+        <span class="stat-sub">{{ spend.n }} transactions</span>
+    </div>
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">📐</span>
+        <span class="stat-label">Avg per transaction</span>
+        <span class="stat-value">₹{{ "{:,.0f}".format(spend.avg_amt or 0) }}</span>
+    </div>
+</div>
+
+<div class="grid-2 mt-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Your monthly trend</div>
+            <div class="card-subtitle">Spend by month</div>
+        </div>
+        <div class="chart-well">
+            {% if monthly %}
+            <canvas data-chart='{"type":"line","labels":{{ monthly | map(attribute="month") | list | tojson }},"datasets":[{"label":"Spend","data":{{ monthly | map(attribute="total") | list | tojson }},"borderColor":"#f59e0b","backgroundColor":"rgba(245,158,11,.15)","fill":true,"tension":.35}]}'></canvas>
+            {% else %}
+            <div class="empty-state"><div class="empty-icon">📊</div><p>No data yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">ML spend forecast</div>
+            <div class="card-subtitle">AI projection for next period</div>
+        </div>
+        {% if forecast %}
+        <div class="stat-grid">
+            {% for k, v in forecast.items() if v is not mapping and v is not sequence %}
+            <div class="glass-card stat-card stat-card--green">
+                <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+                <span class="stat-value" style="font-size:1.05rem">{{ v }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif error %}
+        <div class="callout callout--warn">
+            <span class="emoji">⚠️</span>
+            <span>{{ error }}</span>
+        </div>
+        {% else %}
+        <div class="empty-state"><div class="empty-icon">🔮</div><p>Not enough data yet</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

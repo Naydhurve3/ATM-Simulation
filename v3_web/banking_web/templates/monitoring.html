@@ -1,40 +1,64 @@
 {% extends "base.html" %}
-{% block title %}Monitoring - ATM Banking{% endblock %}
+{% block title %}Model Monitoring — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-    <div class="atm-header">
-        <div class="atm-brand">
-            <div class="atm-icon">&#9881;</div>
-            <h1>MODEL MONITORING</h1>
-        </div>
-        <p class="subtitle">Model health &amp; freshness</p>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Operations</span>
+        <h1>Model Monitoring</h1>
+        <p class="page-desc">Freshness, versions and one-click retraining for every model.</p>
     </div>
+</div>
 
-    {% if versions %}
-    <div class="txn-list full">
-        {% for v in versions %}
-        <div class="txn-item">
-            <div class="txn-info">
-                <span class="txn-type">{{ v.model_name }}</span>
-                <span class="txn-date">v{{ v.version }} | trained {{ (v.last_trained or '')[:16] or 'never' }}</span>
-                {% for k, val in v.metrics.items() %}
-                <span class="txn-notes">{{ k }}: {{ val }}</span>
+{% if train_outcome %}
+<div class="callout {% if 'Failed' in train_outcome[1] %}callout--warn{% else %}callout--success{% endif %} reveal">
+    <span class="emoji">{{ '⚠️' if 'Failed' in train_outcome[1] else '✅' }}</span>
+    <span><strong>{{ train_outcome[0] }}</strong> — {{ train_outcome[1] }}</span>
+</div>
+{% endif %}
+
+{% if stale_models %}
+<div class="callout callout--warn reveal">
+    <span class="emoji">⏰</span>
+    <span><strong>{{ stale_models | length }} stale model(s):</strong> {{ stale_models | join(', ') }} — older than 7 days</span>
+</div>
+{% endif %}
+
+<div class="glass-card reveal">
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Model</th><th>Version</th><th>Last trained</th><th>Age (days)</th><th>Metrics</th><th>Action</th></tr></thead>
+            <tbody>
+                {% for v in versions %}
+                <tr>
+                    <td class="mono small">{{ v.model_name }}</td>
+                    <td class="num">{{ v.version }}</td>
+                    <td class="mono small">{{ v.last_trained[:16] }}</td>
+                    <td>
+                        {% if v.freshness_days > 7 %}
+                        <span class="badge badge--red">{{ v.freshness_days }}d</span>
+                        {% else %}
+                        <span class="badge badge--success">{{ v.freshness_days }}d</span>
+                        {% endif %}
+                    </td>
+                    <td class="small muted">{{ v.metrics }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('routes.monitoring') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="model_name" value="{{ v.model_name }}">
+                            <button class="btn btn--sm btn--accent" type="submit">Retrain</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🤖</div><p>No model registry found</p></div></td></tr>
                 {% endfor %}
-            </div>
-            <span class="txn-amount {% if v.freshness_days > 7 %}negative{% else %}positive{% endif %}">
-                {% if v.freshness_days > 7 %}STALE{% else %}FRESH{% endif %} ({{ v.freshness_days }}d)
-            </span>
-        </div>
-        {% endfor %}
+            </tbody>
+        </table>
     </div>
-    {% else %}
-    <div class="empty-state">
-        <p>No model metrics found in database. Train models first (CLI option 3 &gt; Retrain All).</p>
-    </div>
-    {% endif %}
+</div>
 
-    <div class="atm-footer-links">
-        <a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a>
-    </div>
+<div class="callout callout--info mt-2 reveal">
+    <span class="emoji">ℹ️</span>
+    <span>Models missing optional libraries (prophet, tensorflow, xgboost, statsmodels) will report a failed train — this is expected in stripped-down environments.</span>
 </div>
 {% endblock %}

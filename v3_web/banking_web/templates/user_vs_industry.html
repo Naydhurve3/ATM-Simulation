@@ -1,17 +1,58 @@
 {% extends "base.html" %}
-{% block title %}You vs Industry - Analytics{% endblock %}
+{% block title %}You vs Industry — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>YOU vs INDUSTRY</h1></div><p class="subtitle">Compare yourself to industry averages</p></div>
-  <div class="balance-card" style="margin-bottom:12px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div><div style="font-size:11px;color:#8899aa;">Your Bank</div><div style="font-size:16px;">{{ account.bank }}</div></div>
-      <div><div style="font-size:11px;color:#8899aa;">Your Balance</div><div style="font-size:16px;">&#8377; {{ '%.0f'|format(account.balance) }}</div></div>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>You vs Industry</h1>
+        <p class="page-desc">Your bank's digital share vs the industry average.</p>
     </div>
-  </div>
-  {% if comparison %}
-  <div class="txn-list">{% for k, v in comparison.items() %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div style="font-weight:600;">{{ v }}</div></div>{% endfor %}</div>
-  {% else %}<div class="empty-state"><p>Comparison data not available. Install pandas + run data ingestion first.</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
-</div>{% endblock %}
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+{% if comparison and comparison.error is defined %}
+<div class="callout callout--warn reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ comparison.error }}</span>
+</div>
+{% endif %}
+
+{% if comparison and not comparison.error %}
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--accent reveal">
+        <span class="stat-icon">👤</span>
+        <span class="stat-label">Your balance</span>
+        <span class="stat-value">₹{{ "{:,.0f}".format(comparison.user_balance) }}</span>
+        <span class="stat-sub">{{ comparison.bank }}</span>
+    </div>
+    <div class="glass-card stat-card stat-card--green reveal">
+        <span class="stat-icon">📊</span>
+        <span class="stat-label">Your bank digital share</span>
+        <span class="stat-value">{{ comparison.bank_digital_share }}%</span>
+        <span class="stat-sub">{{ account.bank }}</span>
+    </div>
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">🏭</span>
+        <span class="stat-label">Industry avg digital</span>
+        <span class="stat-value">{{ comparison.industry_avg_digital }}%</span>
+        <span class="stat-sub">across all banks</span>
+    </div>
+    <div class="glass-card stat-card {% if comparison.above_industry %}stat-card--green{% else %}stat-card--gold{% endif %} reveal">
+        <span class="stat-icon">{{ '📈' if comparison.above_industry else '📉' }}</span>
+        <span class="stat-label">Digital gap</span>
+        <span class="stat-value">{{ comparison.digital_gap }}%</span>
+        <span class="stat-sub">{{ 'Above industry' if comparison.above_industry else 'Below industry' }}</span>
+    </div>
+</div>
+
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Digital adoption comparison</div>
+        <div class="card-subtitle">Your bank vs industry average</div>
+    </div>
+    <div class="chart-well">
+        <canvas data-chart='{"type":"bar","labels":["Your bank","Industry avg"],"datasets":[{"label":"Digital share %","data":[{{ comparison.bank_digital_share }},{{ comparison.industry_avg_digital }}],"backgroundColor":["#818cf8","#34d399"]}]}'></canvas>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,39 +1,293 @@
 {% extends "base.html" %}
-{% block title %}Register - ATM Banking{% endblock %}
-{% block content %}
-<div class="screen">
-    <div class="atm-header">
-        <div class="atm-brand">
-            <div class="atm-icon">&#9776;</div>
-            <h1>NEW ACCOUNT</h1>
+{% block title %}Register — ATM Intelligence{% endblock %}
+{% block auth_content %}
+<div class="auth-wrap">
+    <div class="auth-visual">
+        <p class="page-eyebrow">3D Banking Suite · RBI-Powered Analytics</p>
+        <h1>
+            <span class="grad">OPEN YOUR</span><br>
+            <span class="stroke">SMART ACCOUNT</span>
+        </h1>
+        <p class="auth-tag">Full KYC registration in 3 steps — choose any of 65 banks, get your card &amp; account instantly, and enjoy CLI-grade features: minor accounts with guardian, income-based insights and more.</p>
+        <div class="role-row">
+            <span class="pill pill--green">📇 Instant KYC</span>
+            <span class="pill pill--accent">🏦 65 Banks</span>
+            <span class="pill pill--gold">👧 Minor Accounts</span>
+            <span class="pill pill--info">🔐 4-digit PIN</span>
         </div>
-        <p class="subtitle">Open your banking account</p>
     </div>
-    <form method="POST" class="atm-form">
-        <div class="input-group">
-            <label for="name">Full Name</label>
-            <input type="text" id="name" name="name" placeholder="Enter your full name" required autofocus>
+    <div class="auth-form-side">
+        <div class="auth-panel glass-card reveal in">
+            <div class="auth-panel__head">
+                <h2>Create your account</h2>
+                <p>Follow the steps below — all fields matter</p>
+            </div>
+
+            <div class="stepper" id="stepper">
+                <div class="step active" data-step="1"><span class="step-num">1</span> Identity</div>
+                <div class="step-line"></div>
+                <div class="step" data-step="2"><span class="step-num">2</span> Banking</div>
+                <div class="step-line"></div>
+                <div class="step" data-step="3"><span class="step-num">3</span> Security</div>
+            </div>
+
+            <form method="POST" id="reg-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <!-- STEP 1 -->
+                <div class="reg-step" data-step="1">
+                    <div class="form-group">
+                        <label for="name">Full Name <span class="req">*</span></label>
+                        <input class="form-control" type="text" id="name" name="name" placeholder="First and last name"
+                               value="{{ form.get('name', '') if form }}" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email <span class="req">*</span></label>
+                        <input class="form-control" type="email" id="email" name="email" placeholder="you@example.com"
+                               value="{{ form.get('email', '') if form }}" required>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="phone">Phone <span class="req">*</span></label>
+                            <input class="form-control" type="tel" id="phone" name="phone" placeholder="10 digits"
+                                   maxlength="10" inputmode="numeric" pattern="[0-9]*"
+                                   value="{{ form.get('phone', '') if form }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="age">Age <span class="req">*</span></label>
+                            <input class="form-control" type="number" id="age" name="age" placeholder="10–120" min="10" max="120"
+                                   value="{{ form.get('age', '') if form }}" required>
+                            <div class="form-hint" id="age-hint"></div>
+                        </div>
+                    </div>
+                    <button class="btn btn--primary btn--block" type="button" data-next="2" style="margin-top:0.6rem">Continue</button>
+                </div>
+
+                <!-- STEP 2 -->
+                <div class="reg-step" data-step="2" style="display:none">
+                    <div class="form-group">
+                        <label for="income_bracket">Income Status <span class="req">*</span></label>
+                        <select class="form-select" id="income_bracket" name="income_bracket" required>
+                            {% for val, label in income_options %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="bank">Bank <span class="req">*</span></label>
+                        <input class="form-control" type="text" id="bank-search" placeholder="Type to search bank…"
+                               value="{{ form.get('bank', '') if form }}" autocomplete="off">
+                        <input type="hidden" id="bank" name="bank"
+                               value="{{ form.get('bank', '') if form }}">
+                        <div class="filter-chips" id="bank-cats" style="margin-top:0.6rem">
+                            <button type="button" class="filter-chip active" data-cat="all">All</button>
+                            <button type="button" class="filter-chip" data-cat="PSU">PSU</button>
+                            <button type="button" class="filter-chip" data-cat="PVT">Private</button>
+                            <button type="button" class="filter-chip" data-cat="FOREIGN">Foreign</button>
+                            <button type="button" class="filter-chip" data-cat="SFB">Small Finance</button>
+                            <button type="button" class="filter-chip" data-cat="PAYMENTS">Payments</button>
+                        </div>
+                        <select class="form-select" id="bank-list" size="6" name="bank_select" style="margin-top:0.5rem">
+                            {% for b in banks %}
+                            <option value="{{ b }}" data-cat="{{ b | bank_cat }}">{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="guardian-block" id="guardian-block" style="display:none">
+                        <div class="guardian-block__title">👧 Minor Account — Guardian (RBI KYC)</div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="guardian_name">Guardian Name <span class="req">*</span></label>
+                                <input class="form-control" type="text" id="guardian_name" name="guardian_name"
+                                       value="{{ form.get('guardian_name', '') if form }}" placeholder="Full name">
+                            </div>
+                            <div class="form-group">
+                                <label for="guardian_phone">Guardian Phone <span class="req">*</span></label>
+                                <input class="form-control" type="tel" id="guardian_phone" name="guardian_phone"
+                                       maxlength="10" inputmode="numeric" pattern="[0-9]*"
+                                       value="{{ form.get('guardian_phone', '') if form }}" placeholder="10 digits">
+                            </div>
+                            <div class="form-group">
+                                <label for="guardian_relation">Relationship <span class="req">*</span></label>
+                                <select class="form-select" id="guardian_relation" name="guardian_relation">
+                                    <option>Father</option><option>Mother</option><option>Legal Guardian</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="child_surname">Child's Surname <span class="req">*</span></label>
+                                <input class="form-control" type="text" id="child_surname" name="child_surname"
+                                       placeholder="For KYC surname check">
+                            </div>
+                            <div class="form-group">
+                                <label for="child_aadhaar">Child's Aadhaar (last 4) <span class="req">*</span></label>
+                                <input class="form-control" type="text" id="child_aadhaar" name="child_aadhaar"
+                                       maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="1234">
+                            </div>
+                            <div class="form-group">
+                                <label for="guardian_aadhaar">Guardian's Aadhaar (last 4) <span class="req">*</span></label>
+                                <input class="form-control" type="text" id="guardian_aadhaar" name="guardian_aadhaar"
+                                       maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="5678">
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top:0.8rem">
+                            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;color:var(--text-secondary);cursor:pointer">
+                                <input type="checkbox" name="address_match" checked> Address matches guardian's (as per RBI)
+                            </label>
+                        </div>
+                        <div class="form-hint mt-1" id="kyc-status"></div>
+                    </div>
+
+                    <div class="flex mt-2">
+                        <button class="btn btn--ghost" type="button" data-prev="1">← Back</button>
+                        <button class="btn btn--primary" type="button" data-next="3">Continue →</button>
+                    </div>
+                </div>
+
+                <!-- STEP 3 -->
+                <div class="reg-step" data-step="3" style="display:none">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="pin">Create PIN <span class="req">*</span></label>
+                            <input class="form-control" type="password" id="pin" name="pin" placeholder="4 digits"
+                                   maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm_pin">Confirm PIN <span class="req">*</span></label>
+                            <input class="form-control" type="password" id="confirm_pin" name="confirm_pin"
+                                   placeholder="Re-enter" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+                                   autocomplete="new-password" required>
+                        </div>
+                    </div>
+                    <div class="callout callout--info mt-2">
+                        <span class="emoji">ℹ️</span>
+                        <span>PIN protects all ATM &amp; web operations. Never share it — not even with bank staff.</span>
+                    </div>
+                    <div class="flex mt-2">
+                        <button class="btn btn--ghost" type="button" data-prev="2">← Back</button>
+                        <button class="btn btn--green" type="submit">Create Account ✨</button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="auth-alt">
+                Already have an account? <a href="{{ url_for('auth.login') }}">Login</a>
+            </div>
         </div>
-        <div class="input-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" placeholder="Enter your email" required>
-        </div>
-        <div class="input-group">
-            <label for="phone">Phone (10 digits)</label>
-            <input type="tel" id="phone" name="phone" placeholder="Enter 10-digit phone" maxlength="10" inputmode="numeric" pattern="[0-9]*" required>
-        </div>
-        <div class="input-group">
-            <label for="pin">Create PIN (4 digits)</label>
-            <input type="password" id="pin" name="pin" placeholder="Create a 4-digit PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" required>
-        </div>
-        <div class="input-group">
-            <label for="confirm_pin">Confirm PIN</label>
-            <input type="password" id="confirm_pin" name="confirm_pin" placeholder="Re-enter PIN" maxlength="4" inputmode="numeric" pattern="[0-9]*" required>
-        </div>
-        <button type="submit" class="atm-btn">CREATE ACCOUNT</button>
-    </form>
-    <div class="atm-footer-links">
-        <a href="{{ url_for('auth.login') }}">Already have an account? Login</a>
     </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+    var form = document.getElementById('reg-form');
+    var steps = form.querySelectorAll('.reg-step');
+    var stepper = document.getElementById('stepper');
+    var bankSearch = document.getElementById('bank-search');
+    var bankHidden = document.getElementById('bank');
+    var bankSelect = document.getElementById('bank-list');
+    var cats = document.querySelectorAll('#bank-cats .filter-chip');
+
+    function showStep(n) {
+        steps.forEach(function (s) { s.style.display = s.getAttribute('data-step') === String(n) ? '' : 'none'; });
+        stepper.querySelectorAll('.step').forEach(function (st) {
+            var sn = parseInt(st.getAttribute('data-step'), 10);
+            st.classList.toggle('active', sn === n);
+            st.classList.toggle('done', sn < n);
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function stepFields(n) {
+        return Array.prototype.slice.call(steps).filter(function (s) { return s.getAttribute('data-step') === String(n); })[0]
+            .querySelectorAll('input, select, textarea');
+    }
+
+    function validateStep(n) {
+        var ok = true;
+        stepFields(n).forEach(function (el) {
+            if (el.hasAttribute('required') || (n === 2 && el.id === 'bank-list')) {
+                if (el.id === 'bank-list') { if (!bankHidden.value) ok = false; return; }
+                if (!el.value || !el.value.trim()) { ok = false; el.style.borderColor = 'var(--danger)'; }
+                else el.style.borderColor = '';
+            }
+        });
+        return ok;
+    }
+
+    form.querySelectorAll('[data-next]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var cur = parseInt(btn.getAttribute('data-next'), 10) - 1;
+            if (validateStep(cur)) showStep(parseInt(btn.getAttribute('data-next'), 10));
+            else alert('Please fill all fields marked * in this step.');
+        });
+    });
+    form.querySelectorAll('[data-prev]').forEach(function (btn) {
+        btn.addEventListener('click', function () { showStep(parseInt(btn.getAttribute('data-prev'), 10)); });
+    });
+
+    /* bank search + category filter */
+    function renderBanks() {
+        var q = bankSearch.value.trim().toLowerCase();
+        var cat = document.querySelector('#bank-cats .filter-chip.active').getAttribute('data-cat');
+        Array.prototype.forEach.call(bankSelect.options, function (o) {
+            var show = (cat === 'all' || o.getAttribute('data-cat') === cat) &&
+                       (!q || o.value.toLowerCase().indexOf(q) !== -1);
+            o.style.display = show ? '' : 'none';
+        });
+        if (bankSelect.value) bankHidden.value = bankSelect.value;
+    }
+    bankSearch.addEventListener('input', renderBanks);
+    cats.forEach(function (c) {
+        c.addEventListener('click', function () {
+            cats.forEach(function (x) { x.classList.remove('active'); });
+            c.classList.add('active');
+            renderBanks();
+        });
+    });
+    bankSelect.addEventListener('change', function () { bankHidden.value = bankSelect.value; });
+    renderBanks();
+
+    /* age → guardian + age group hint */
+    var ageEl = document.getElementById('age');
+    var hint = document.getElementById('age-hint');
+    var gBlock = document.getElementById('guardian-block');
+    function ageChanged() {
+        var a = parseInt(ageEl.value, 10);
+        var minor = !isNaN(a) && a >= 10 && a < 18;
+        gBlock.style.display = minor ? '' : 'none';
+        var g = !isNaN(a) ? (a >= 10 && a <= 13 ? 'Child' : a <= 17 ? 'Teen' : a <= 25 ? 'Young Adult' : a <= 40 ? 'Adult' : a <= 60 ? 'Middle-aged' : 'Senior') : '';
+        hint.textContent = g ? 'Category: ' + g + (minor ? ' — guardian required' : '') : '';
+    }
+    ageEl.addEventListener('input', ageChanged);
+    ageChanged();
+
+    /* live KYC surname check */
+    function kycCheck() {
+        var child = document.getElementById('child_surname').value.trim().toUpperCase();
+        var g = document.getElementById('guardian_name').value.trim().toUpperCase();
+        var status = document.getElementById('kyc-status');
+        if (!child || !g) { status.textContent = ''; return; }
+        var gSurname = g.split(' ').slice(-1)[0] || '';
+        var addr = document.querySelector('[name=address_match]').checked;
+        if (gSurname === child && addr) status.innerHTML = '✅ <span style="color:var(--success)">KYC verified — address &amp; surname match</span>';
+        else if (addr) status.innerHTML = '⚠️ <span style="color:var(--warning)">Address matches, surname differs — extra verification may be needed</span>';
+        else status.innerHTML = '⚠️ <span style="color:var(--warning)">Address mismatch — address proof required</span>';
+    }
+    ['child_surname', 'guardian_name'].forEach(function (id) {
+        document.getElementById(id).addEventListener('input', kycCheck);
+    });
+    document.querySelector('[name=address_match]').addEventListener('change', kycCheck);
+
+    /* final submit: validate all */
+    form.addEventListener('submit', function (e) {
+        var all = true;
+        [1, 2, 3].forEach(function (n) { if (!validateStep(n)) all = false; });
+        if (!all) { e.preventDefault(); alert('Please complete all required fields across all steps.'); }
+        else if (form.querySelector('#pin').value !== form.querySelector('#confirm_pin').value) {
+            e.preventDefault(); alert('PINs do not match.');
+        }
+    });
+})();
+</script>
 {% endblock %}

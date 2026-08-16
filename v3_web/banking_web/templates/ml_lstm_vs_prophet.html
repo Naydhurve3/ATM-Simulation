@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}LSTM vs Prophet — ML Lab{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Industry Models</span>
+        <h1>LSTM vs Prophet</h1>
+        <p class="page-desc">The deep learning and classical forecasting models go head-to-head.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+<div class="glass-card reveal">
+    <div class="card-head">
+        <div class="card-title">Forecast configuration</div>
+        <div class="card-subtitle">Compare both models on the same data</div>
+    </div>
+    <form class="flex flex-wrap" method="get" action="{{ url_for('routes.lstm_vs_prophet') }}">
+        <select class="form-control" name="bank" style="max-width:260px">
+            {% for b in banks %}
+            <option value="{{ b }}" {% if b == bank %}selected{% endif %}>{{ b }}</option>
+            {% endfor %}
+        </select>
+        <select class="form-control" name="metric" style="max-width:220px">
+            {% for m in ['DC_Vol_Cash_ATM', 'DC_Vol_Card_Txn', 'CBS_Vol', 'DD_Vol', 'PO_Vol'] %}
+            <option value="{{ m }}" {% if m == metric %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+        <button class="btn btn--primary" type="submit">Compare</button>
+    </form>
+</div>
+
+{% if error %}
+<div class="callout callout--warn mt-2 reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ error }}</span>
+    <p class="mt-1" style="opacity:.8">Both models require optional libraries (<code>prophet</code>, <code>tensorflow</code>/<code>keras</code>). Install them to enable full comparison.</p>
+</div>
+{% endif %}
+
+{% if precomputed %}
+<div class="mt-2 reveal">
+    <span class="pill pill--accent">⚡ Precomputed snapshot</span>
+</div>
+{% endif %}
+
+<div class="grid-2 mt-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Prophet forecast</div>
+            <div class="card-subtitle">Classical additive model</div>
+        </div>
+        {% if prophet %}
+        <div class="stat-grid">
+            {% for k, v in prophet.items() if v is not mapping and v is not sequence %}
+            <div class="glass-card stat-card stat-card--accent">
+                <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+                <span class="stat-value" style="font-size:1rem">{{ v }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if prophet.forecast is defined %}
+        <div class="chart-well mt-2">
+            <canvas data-chart='{"type":"line","labels":{{ prophet.forecast | map(attribute="ds") | list | tojson }},"datasets":[{"label":"Prophet","data":{{ prophet.forecast | map(attribute="yhat") | list | tojson }},"borderColor":"#818cf8","backgroundColor":"rgba(129,140,248,.15)","fill":true,"tension":.3}]}'></canvas>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state"><div class="empty-icon">🔮</div><p>Prophet unavailable</p></div>
+        {% endif %}
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">LSTM forecast</div>
+            <div class="card-subtitle">Deep recurrent network</div>
+        </div>
+        {% if lstm %}
+        <div class="stat-grid">
+            {% for k, v in lstm.items() if v is not mapping and v is not sequence %}
+            <div class="glass-card stat-card stat-card--green">
+                <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+                <span class="stat-value" style="font-size:1rem">{{ v }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if lstm.forecast is defined %}
+        <div class="chart-well mt-2">
+            <canvas data-chart='{"type":"line","labels":{{ lstm.forecast | map(attribute="ds") | list | tojson }},"datasets":[{"label":"LSTM","data":{{ lstm.forecast | map(attribute="yhat") | list | tojson }},"borderColor":"#34d399","backgroundColor":"rgba(52,211,153,.15)","fill":true,"tension":.3}]}'></canvas>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state"><div class="empty-icon">🧠</div><p>LSTM unavailable</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Demo Tour — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Guided Experience</span>
+        <h1>Demo Tour</h1>
+        <p class="page-desc">A 5-minute walkthrough of everything this system can do.</p>
+    </div>
+    <button class="btn btn--primary" id="start-tour">▶ Start guided tour</button>
+</div>
+
+<div class="nav-grid">
+    <a class="nav-tile" href="{{ url_for('routes.balance') }}"><span class="nav-icon">🏦</span><span class="nav-title">1 · Check balance</span><span class="nav-sub">Your ATM card view</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.deposit') }}"><span class="nav-icon">💵</span><span class="nav-title">2 · Deposit</span><span class="nav-sub">+2 credit score per deposit</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.withdraw') }}"><span class="nav-icon">🏧</span><span class="nav-title">3 · Withdraw</span><span class="nav-sub">Try a big amount — watch fraud detection fire</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.transfer') }}"><span class="nav-icon">🔁</span><span class="nav-title">4 · Transfer</span><span class="nav-sub">Bank transfer or UPI</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.credit_score') }}"><span class="nav-icon">🎯</span><span class="nav-title">5 · Credit score</span><span class="nav-sub">Factor-by-factor breakdown</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.savings_optimize') }}"><span class="nav-icon">🐷</span><span class="nav-title">6 · Savings optimizer</span><span class="nav-sub">AI monthly plan</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.loans') }}"><span class="nav-icon">🏗️</span><span class="nav-title">7 · Loans</span><span class="nav-sub">4 offers scored by ML</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.investment_suggestions') }}"><span class="nav-icon">📈</span><span class="nav-title">8 · Investments</span><span class="nav-sub">Risk-based allocation</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.rfm') }}"><span class="nav-icon">🎯</span><span class="nav-title">9 · RFM segment</span><span class="nav-sub">Where do you sit?</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.analytics') }}"><span class="nav-icon">📊</span><span class="nav-title">10 · Analytics hub</span><span class="nav-sub">9 industry dashboards</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.ml_churn_analysis') }}"><span class="nav-icon">📉</span><span class="nav-title">11 · Churn risk</span><span class="nav-sub">Personal AI prediction</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.bank_explorer') }}"><span class="nav-icon">🏦</span><span class="nav-title">12 · Bank explorer</span><span class="nav-sub">19 banks, random pick</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.reports') }}"><span class="nav-icon">📄</span><span class="nav-title">13 · Reports</span><span class="nav-sub">CSV · Excel · Passbook PDF</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.monitoring') }}"><span class="nav-icon">🤖</span><span class="nav-title">14 · Model monitor</span><span class="nav-sub">Retrain any model</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.feedback') }}"><span class="nav-icon">💬</span><span class="nav-title">15 · Feedback</span><span class="nav-sub">AI sentiment analysis</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.settings_page') }}"><span class="nav-icon">⚙️</span><span class="nav-title">16 · Settings</span><span class="nav-sub">Data management</span></a>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    var tour = document.getElementById('start-tour');
+    if (tour) {
+        tour.addEventListener('click', function () {
+            var tiles = document.querySelectorAll('.nav-tile');
+            var i = 0;
+            function step() {
+                if (i >= tiles.length) { flashToasts.push({ type: 'success', text: 'Tour complete — explore anything!' }); showFlashes(); return; }
+                tiles[i].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                tiles[i].classList.add('nav-tile--tour');
+                setTimeout(function () { tiles[i].classList.remove('nav-tile--tour'); i++; step(); }, 900);
+            }
+            step();
+        });
+    }
+</script>
+{% endblock %}

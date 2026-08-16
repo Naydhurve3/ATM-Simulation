@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Withdraw — Confirmation — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ATM Operations</span>
+        <h1>⚠️ Suspicious withdrawal flagged</h1>
+        <p class="page-desc">Our fraud detection engine flagged this transaction. Please confirm before proceeding.</p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.withdraw') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="amount" value="{{ amount }}">
+        <input type="hidden" name="confirmed" value="yes">
+        <div class="card-head">
+            <div class="card-title">Transaction under review</div>
+            <div class="card-subtitle">Amount: ₹{{ "{:,.2f}".format(amount) }}</div>
+        </div>
+
+        <div class="callout callout--warn">
+            <span class="emoji">🚨</span>
+            <span><strong>Fraud score: {{ "%.0f" | format((fraud.fraud_score or 0) * 100) }}%</strong> — {{ fraud.method | replace('_', ' ') | title }} engine</span>
+        </div>
+
+        <div class="detail-list mt-2">
+            <div class="detail-item"><span class="k">Current balance</span><span class="v">₹{{ "{:,.2f}".format(account.balance) }}</span></div>
+            <div class="detail-item"><span class="k">Withdrawal amount</span><span class="v">₹{{ "{:,.2f}".format(amount) }}</span></div>
+            <div class="detail-item"><span class="k">Remaining after</span><span class="v">₹{{ "{:,.2f}".format(account.balance - amount) }}</span></div>
+        </div>
+
+        <h3 class="form-label mt-2" style="display:block">Why it was flagged</h3>
+        <ul class="flag-list">
+            {% for r in fraud.reasons %}
+            <li><span class="flag-dot">●</span> {{ r | replace('_', ' ') | title }}</li>
+            {% else %}
+            <li><span class="flag-dot">●</span> Unusual activity pattern detected</li>
+            {% endfor %}
+        </ul>
+
+        <div class="flex flex-wrap mt-2">
+            <button class="btn btn--danger" type="submit">Yes, proceed with withdrawal</button>
+            <a class="btn btn--ghost" href="{{ url_for('routes.balance') }}">No, go back</a>
+        </div>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">About fraud detection</div>
+            <div class="card-subtitle">How the engine protects you</div>
+        </div>
+        <p style="opacity:.8">The fraud engine combines rule-based checks (amount vs. balance, daily limits) with ML anomaly scoring. A flag does not block your withdrawal — it simply asks you to confirm, protecting you from card skimming or unauthorised use.</p>
+        <a class="btn btn--ghost" href="{{ url_for('routes.security') }}">View security centre →</a>
+    </div>
+</div>
+{% endblock %}

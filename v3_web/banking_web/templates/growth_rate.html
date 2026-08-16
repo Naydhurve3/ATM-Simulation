@@ -1,10 +1,26 @@
 {% extends "base.html" %}
-{% block title %}Growth Rate - Analytics{% endblock %}
+{% block title %}Growth Rate — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>GROWTH RATE</h1></div><p class="subtitle">Industry growth trends</p></div>
-  {% if growth_rate is not none %}
-  <div class="balance-card"><div class="balance-label">Growth Rate (YoY)</div><div class="balance-amount">{{ '%.1f'|format(growth_rate) }}%</div></div>
-  {% else %}<div class="empty-state"><p>Growth data not available. Install full dependencies.</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>Growth Rate</h1>
+        <p class="page-desc">Month-over-month expansion of the ATM ecosystem.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+<div class="glass-card reveal">
+    <div class="card-head">
+        <div class="card-title">Industry growth trend</div>
+        <div class="card-subtitle">Volume growth per month</div>
+    </div>
+    <div class="chart-well">
+        {% if growth_rate %}
+        <canvas data-chart='{"type":"line","labels":{{ growth_rate | map(attribute="Reporting_Month") | list | tojson }},"datasets":[{"label":"MoM growth %","data":{{ growth_rate | map(attribute="MoM_Growth_%") | list | tojson }},"borderColor":"#34d399","backgroundColor":"rgba(52,211,153,.15)","fill":true,"tension":.35}]}'></canvas>
+        {% else %}
+        <div class="empty-state"><div class="empty-icon">📈</div><p>No growth data available</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

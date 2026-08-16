@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Transaction Volume — ML Lab{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Industry Models</span>
+        <h1>Transaction Volume Predictor</h1>
+        <p class="page-desc">Predicts industry-wide transaction volumes and explains which features matter.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.txn_volume') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">Target metric</div>
+            <div class="card-subtitle">What to predict</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="target">Target column</label>
+            <select class="form-control" name="target" id="target">
+                {% for m in ['DC_Vol_Cash_ATM', 'DC_Vol_Card_Txn', 'CBS_Vol', 'DD_Vol', 'PO_Vol'] %}
+                <option value="{{ m }}" {% if m == target %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn--primary" type="submit">Predict</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Prediction</div>
+            <div class="card-subtitle">For a typical metro network profile</div>
+        </div>
+        {% if precomputed %}
+        <span class="pill pill--accent mb-1">⚡ Precomputed snapshot</span>
+        {% endif %}
+        {% if features %}
+        <div class="stat-grid">
+            {% for k, v in features.items() if v is not mapping and v is not sequence %}
+            <div class="glass-card stat-card stat-card--green">
+                <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+                <span class="stat-value" style="font-size:1rem">{{ v }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif error %}
+        <div class="callout callout--warn">
+            <span class="emoji">⚠️</span>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if importance %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Feature importance</div>
+        <div class="card-subtitle">What drives volume most</div>
+    </div>
+    <div class="rank-list">
+        {% for feat, imp in importance.items() %}
+        <div class="rank-item">
+            <span class="rank-name">{{ feat | replace('_', ' ') }}</span>
+            <div class="progress rank-progress"><div class="progress__bar--green" style="width:{{ (imp * 100) if imp <= 1 else imp }}%"></div></div>
+            <span class="rank-score">{{ "%.3f" | format(imp) }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

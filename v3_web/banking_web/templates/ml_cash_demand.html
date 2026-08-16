@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Cash Demand — ML Lab{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Industry Models</span>
+        <h1>Cash Demand Forecaster</h1>
+        <p class="page-desc">Prophet-style ATM cash demand prediction per bank &amp; metric.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="get" action="{{ url_for('routes.cash_demand') }}">
+        <div class="card-head">
+            <div class="card-title">Forecast inputs</div>
+            <div class="card-subtitle">Bank + metric</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="bank">Bank</label>
+            <select class="form-control" name="bank" id="bank">
+                {% for b in banks %}
+                <option value="{{ b }}" {% if b == bank %}selected{% endif %}>{{ b }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="metric">Metric</label>
+            <select class="form-control" name="metric" id="metric">
+                {% for m in ['DC_Vol_Cash_ATM', 'DC_Vol_Card_Txn', 'CBS_Vol', 'DD_Vol', 'PO_Vol'] %}
+                <option value="{{ m }}" {% if m == metric %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn--primary" type="submit">Forecast</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Prediction</div>
+            <div class="card-subtitle">{{ bank }} · {{ metric }}</div>
+        </div>
+        {% if precomputed %}
+        <span class="pill pill--accent mb-1">⚡ Precomputed snapshot</span>
+        {% endif %}
+        {% if prediction %}
+        <div class="stat-grid">
+            {% for k, v in prediction.items() if v is not mapping and v is not sequence %}
+            <div class="glass-card stat-card stat-card--accent">
+                <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+                <span class="stat-value" style="font-size:1.05rem">{{ v }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% if prediction.forecast is defined %}
+        <div class="chart-well mt-2">
+            <canvas data-chart='{"type":"line","labels":{{ prediction.forecast | map(attribute="ds") | list | tojson }},"datasets":[{"label":"Forecast","data":{{ prediction.forecast | map(attribute="yhat") | list | tojson }},"borderColor":"#818cf8","backgroundColor":"rgba(129,140,248,.15)","fill":true,"tension":.3}]}'></canvas>
+        </div>
+        {% endif %}
+        {% elif error %}
+        <div class="callout callout--warn">
+            <span class="emoji">⚠️</span>
+            <span>{{ error }}</span>
+        </div>
+        <div class="callout callout--info mt-1">
+            <span class="emoji">🔧</span>
+            <span>This model needs <code>prophet</code> (optional). The app retrains automatically when available.</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if backtest %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Backtest</div>
+        <div class="card-subtitle">Historical accuracy check</div>
+    </div>
+    <div class="detail-list">
+        {% for k, v in backtest.items() if v is not mapping and v is not sequence %}
+        <div class="detail-item"><span class="k">{{ k | replace('_', ' ') | title }}</span><span class="v">{{ v }}</span></div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

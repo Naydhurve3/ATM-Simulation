@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Privacy — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Your Data, Your Rules</span>
+        <h1>Privacy Centre</h1>
+        <p class="page-desc">What we collect, why, and how you can take full control of your data.</p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">What we collect</div>
+            <div class="card-subtitle">Only what is needed to run your account</div>
+        </div>
+        <ul class="flag-list">
+            <li><span class="flag-dot flag-dot--green">●</span> Profile details you enter at registration (name, phone, email, age)</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Transaction history generated while you use the demo</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Session activity (logins and logouts)</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Loan applications, savings goals and feedback you create</li>
+        </ul>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">How we protect it</div>
+            <div class="card-subtitle">Security by design</div>
+        </div>
+        <ul class="flag-list">
+            <li><span class="flag-dot flag-dot--green">●</span> Your PIN is stored as a salted PBKDF2 hash — never in plain text</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Every action on this site is CSRF-protected</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Sessions are encrypted cookies, tied to server records you can revoke</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Industry data on this demo is RBI-style public statistics — not customer data</li>
+        </ul>
+    </div>
+</div>
+
+<div class="grid-2 mt-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Your rights</div>
+            <div class="card-subtitle">Full control, available right now</div>
+        </div>
+        <div class="privacy-actions">
+            <a class="btn btn--primary btn--block mb-1" href="{{ url_for('routes.export_my_data') }}">⬇️ Download my data</a>
+            {% if session.get('user_id') %}
+            <a class="btn btn--ghost btn--block mb-1" href="{{ url_for('routes.sessions_page') }}">🖥️ Manage active sessions</a>
+            <a class="btn btn--ghost btn--block" href="{{ url_for('routes.change_pin') }}">🔐 Change my PIN</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Delete my account</div>
+            <div class="card-subtitle">Right to erasure — irreversible</div>
+        </div>
+        <p class="small muted mb-1">This permanently removes your profile, transactions, fraud flags, credit history, loans, sessions, savings goals and feedback.</p>
+        {% if session.get('user_id') %}
+        <form method="POST" action="{{ url_for('routes.delete_account') }}"
+              onsubmit="return confirm('This permanently deletes your account and ALL associated data. Continue?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--danger btn--block" type="submit">🗑️ Permanently delete my account</button>
+        </form>
+        {% else %}
+        <p class="small muted">Log in to manage or delete your account.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Cookies</div>
+        <div class="card-subtitle">What this demo stores in your browser</div>
+    </div>
+    <p class="small muted mb-1">We use one session cookie to keep you logged in and one CSRF token cookie to protect your forms. No advertising or tracking cookies are used. Cookies are HttpOnly and SameSite=Lax.</p>
+</div>
+{% endblock %}

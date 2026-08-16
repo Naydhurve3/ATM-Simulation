@@ -1,12 +1,42 @@
 {% extends "base.html" %}
-{% block title %}Monthly Trend - Analytics{% endblock %}
+{% block title %}Monthly Trends — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>MONTHLY TREND</h1></div><p class="subtitle">Your transaction patterns over time</p></div>
-  {% if user_trends %}
-  <div class="txn-list">{% for t in user_trends %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ t.month }}</span><span class="txn-date">{{ t.type }}</span></div><div style="text-align:right;"><div style="font-weight:600;">&#8377; {{ '%.0f'|format(t.total) }}</div><div style="font-size:11px;color:#667788;">{{ t.cnt }} txns</div></div></div>{% endfor %}</div>
-  {% else %}<div class="empty-state"><p>No transaction data yet. Start banking to see trends!</p></div>{% endif %}
-  {% if fig_loaded %}<div class="empty-state"><p>RBI industry trend data loaded. Check the RBI dashboard for full charts.</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back to Analytics</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>Monthly Trends</h1>
+        <p class="page-desc">Industry-wide ATM volume vs. your own monthly activity.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Industry monthly volume</div>
+            <div class="card-subtitle">All banks · per month</div>
+        </div>
+        <div class="chart-well">
+            {% if industry %}
+            <canvas data-chart='{"type":"line","labels":{{ industry | map(attribute="Reporting_Month") | list | tojson }},"datasets":[{"label":"Total volume","data":{{ industry | map(attribute="Total_Txn_Vol") | list | tojson }},"borderColor":"#818cf8","backgroundColor":"rgba(129,140,248,.15)","fill":true,"tension":.35}]}'></canvas>
+            {% else %}
+            <div class="empty-state"><div class="empty-icon">📊</div><p>No industry data available</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Your monthly activity</div>
+            <div class="card-subtitle">Credits vs debits by month</div>
+        </div>
+        <div class="chart-well">
+            {% if user_trends %}
+            <canvas data-chart='{"type":"bar","labels":{{ user_trends | map(attribute="month") | list | tojson }},"datasets":[{"label":"Total","data":{{ user_trends | map(attribute="total") | list | tojson }},"backgroundColor":"#34d399"}]}'></canvas>
+            {% else %}
+            <div class="empty-state"><div class="empty-icon">📊</div><p>No personal data yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

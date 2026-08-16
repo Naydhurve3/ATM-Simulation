@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Settings — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">System</span>
+        <h1>Settings</h1>
+        <p class="page-desc">Data store, RBI sources and maintenance actions.</p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Data directories</div>
+            <div class="card-subtitle">Where everything lives</div>
+        </div>
+        {% if info.tables is defined %}
+        <div class="detail-list">
+            {% for label, st in data_status.items() %}
+            <div class="detail-item"><span class="k">{{ label }}</span><span class="v">{{ st.count }} files · {{ st.size_mb }} MB</span></div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="callout callout--warn"><span class="emoji">⚠️</span><span>{{ info.error }}</span></div>
+        {% endif %}
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Database tables</div>
+            <div class="card-subtitle">Ecosystem store row counts</div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Table</th><th>Rows</th></tr></thead>
+                <tbody>
+                    {% for t in info.tables %}
+                    <tr>
+                        <td class="mono small">{{ t.name }}</td>
+                        <td class="num">{{ t.rows if t.rows is not none else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% if rbi_status %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">RBI data sources</div>
+        <div class="card-subtitle">From sources_manifest.json</div>
+    </div>
+    <div class="detail-list">
+        {% for src, meta in rbi_status.items() %}
+        <div class="detail-item"><span class="k">{{ src }}</span><span class="v small">{{ meta.get('status', '') }} · {{ meta.get('date', '') }}</span></div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="grid-2 mt-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Maintenance</div>
+            <div class="card-subtitle">System actions</div>
+        </div>
+        <div class="flex flex-wrap">
+            <form method="post" action="{{ url_for('routes.settings_refresh_rbi') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn" type="submit">🔄 Refresh RBI data</button>
+            </form>
+            <form method="post" action="{{ url_for('routes.settings_reset_atm') }}" onsubmit="return confirm('Reset daily ATM usage for all users?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn" type="submit">⏱️ Reset ATM usage</button>
+            </form>
+            <a class="btn btn--ghost" href="{{ url_for('routes.export_training_data') }}">📦 Export training data (.zip)</a>
+        </div>
+        <p class="form-hint mt-2">RBI refresh runs the downloader script in a subprocess (may take minutes). Anti-bot pages may block automatic download.</p>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">About this build</div>
+            <div class="card-subtitle">V3 web redesign</div>
+        </div>
+        <ul class="flag-list">
+            <li><span class="flag-dot flag-dot--green">●</span> Portfolio-inspired design system (glass + neon)</li>
+            <li><span class="flag-dot flag-dot--green">●</span> 3D ATM hero with reduced-motion support</li>
+            <li><span class="flag-dot flag-dot--green">●</span> CSRF protection on all state-changing requests</li>
+            <li><span class="flag-dot flag-dot--green">●</span> 12 ML models wired to real data</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

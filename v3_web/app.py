@@ -95,7 +95,8 @@ def _init_database(db_path: Path):
         );
     """)
 
-    pin_hash = hashlib.sha256(b"1234").hexdigest()
+    from banking_core.utils import hash_pin
+    pin_hash = hash_pin("1234")
     c.execute("""
         INSERT INTO users (name, phone, email, age, age_group, is_minor,
             account_no, card_no, bank, account_type, pin_hash, balance,
@@ -110,8 +111,9 @@ def _init_database(db_path: Path):
     conn.close()
 
 
-# On Vercel, redirect writable paths to /tmp
-if os.environ.get("VERCEL") == "1":
+# On Vercel (sqlite mode only), redirect writable paths to /tmp.
+# With DATABASE_URL set we run in Neon (PG) mode and skip the /tmp shim.
+if os.environ.get("VERCEL") == "1" and not _USE_PG:
     tmp_dir = Path("/tmp/atm_data")
     processed_dir = tmp_dir / "processed"
     processed_dir.mkdir(parents=True, exist_ok=True)
@@ -140,6 +142,21 @@ if os.environ.get("VERCEL") == "1":
         pass
 
 elif _USE_PG:
+    # Neon mode: redirect all data/output paths to /tmp (serverless FS is read-only)
+    import banking_core.utils
+    pg_tmp = Path("/tmp/atm_data")
+    pg_processed = pg_tmp / "processed"
+    pg_processed.mkdir(parents=True, exist_ok=True)
+    banking_core.utils.PROJECT_ROOT = pg_tmp
+    banking_core.utils.DB_PATH = pg_processed / "atm_data.db"
+    banking_core.utils.ECOSYSTEM_DB = pg_processed / "ecosystem.db"
+    banking_core.utils.DATA_RAW = pg_tmp / "data" / "raw"
+    banking_core.utils.DATA_PROCESSED = pg_processed
+    banking_core.utils.DATA_MODELS = pg_tmp / "data" / "models"
+    banking_core.utils.OUTPUTS_REPORTS = pg_tmp / "outputs" / "reports"
+    banking_core.utils.OUTPUTS_CHARTS = pg_tmp / "outputs" / "charts"
+    banking_core.utils.DATA_TRAINING = pg_tmp / "data" / "training"
+    banking_core.utils.ensure_dirs()
     from banking_core.data.postgres_adapter import init_db as pg_init
     pg_init()
 

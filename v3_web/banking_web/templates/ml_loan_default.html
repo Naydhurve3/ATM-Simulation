@@ -1,17 +1,88 @@
 {% extends "base.html" %}
-{% block title %}Loan Default Risk - ML Insights{% endblock %}
+{% block title %}Loan Default Risk — ML Lab{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#8364;</div><h1>LOAN DEFAULT RISK</h1></div><p class="subtitle">ML-powered risk assessment</p></div>
-  {% if default_risk %}{% if default_risk.get('error') %}
-  <div class="empty-state"><p>ML model unavailable: {{ default_risk.error[:80] }}</p></div>
-  {% else %}
-  <div class="balance-card">
-    <div class="balance-label">Default Probability</div>
-    <div class="balance-amount" style="font-size:24px;">{{ '%.1f'|format(default_risk.probability or default_risk.get('default_prob', 0) * 100) }}%</div>
-  </div>
-  <div class="txn-list">{% for k, v in default_risk.items() %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div>{{ v }}</div></div>{% endfor %}</div>
-  {% endif %}{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.insights') }}">Back</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Personal Models</span>
+        <h1>Loan Default Risk</h1>
+        <p class="page-desc">Simulate a loan and get AI risk scoring plus a full amortization schedule.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.ml_loan_default') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">Loan parameters</div>
+            <div class="card-subtitle">Adjust and re-score</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="amount">Amount (₹)</label>
+            <input class="form-control" type="number" name="amount" id="amount" min="1000" step="1000" value="{{ loan_amount }}">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="rate">Interest rate (% p.a.)</label>
+            <input class="form-control" type="number" name="rate" id="rate" min="1" step="0.5" value="{{ loan_rate }}">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="tenure">Tenure (months)</label>
+            <input class="form-control" type="number" name="tenure" id="tenure" min="1" max="120" value="{{ tenure }}">
+        </div>
+        <button class="btn btn--primary" type="submit">Score this loan</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Risk verdict</div>
+            <div class="card-subtitle">For ₹{{ "{:,.0f}".format(loan_amount) }} @ {{ loan_rate }}% / {{ tenure }} months</div>
+        </div>
+        {% if default_risk.error is defined %}
+        <div class="callout callout--warn">
+            <span class="emoji">⚠️</span>
+            <span>{{ default_risk.error }}</span>
+        </div>
+        {% else %}
+        <div class="stat-grid">
+            <div class="glass-card stat-card {% if default_risk.risk_level == 'LOW' %}stat-card--green{% elif default_risk.risk_level == 'MEDIUM' %}stat-card--gold{% else %}stat-card--red{% endif %}">
+                <span class="stat-icon">📉</span>
+                <span class="stat-label">Default risk</span>
+                <span class="stat-value">{{ "%.1f%%" | format(default_risk.risk_score * 100) }}</span>
+                <span class="stat-sub">{{ default_risk.risk_level }}</span>
+            </div>
+            <div class="glass-card stat-card {% if default_risk.eligible %}stat-card--green{% else %}stat-card--gold{% endif %}">
+                <span class="stat-icon">{{ '✓' if default_risk.eligible else '✕' }}</span>
+                <span class="stat-label">Eligible</span>
+                <span class="stat-value">{{ 'Yes' if default_risk.eligible else 'No' }}</span>
+                <span class="stat-sub">Recommended max: ₹{{ "{:,.0f}".format(default_risk.recommended_max or 0) }}</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if amortization %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Amortization schedule</div>
+        <div class="card-subtitle">First 12 months · full schedule below</div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Month</th><th>Payment</th><th>Interest</th><th>Principal</th><th>Balance</th></tr></thead>
+            <tbody>
+                {% for a in amortization[:12] %}
+                <tr>
+                    <td class="num">{{ a.month }}</td>
+                    <td class="num">₹{{ "{:,.2f}".format(a.payment) }}</td>
+                    <td class="num">₹{{ "{:,.2f}".format(a.interest) }}</td>
+                    <td class="num">₹{{ "{:,.2f}".format(a.principal) }}</td>
+                    <td class="num">₹{{ "{:,.2f}".format(a.balance) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

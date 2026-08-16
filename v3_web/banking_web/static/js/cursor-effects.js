@@ -35,7 +35,7 @@
                 life: 1,
                 maxLife: 0.6 + Math.random() * 0.6,
                 size: 2 + Math.random() * 3,
-                hue: 210 + Math.random() * 30,
+                hue: (Math.random() < 0.15 ? 160 : 232) + Math.random() * 26,
             });
         }
     });

@@ -1,16 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Bank Recommendation - ML Insights{% endblock %}
+{% block title %}Bank Recommender — ML Lab{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#127974;</div><h1>BANK RECOMMENDATION</h1></div><p class="subtitle">Find your ideal bank</p></div>
-  <div class="balance-card" style="margin-bottom:12px;">
-    <div class="balance-label">Current Bank</div><div class="balance-amount" style="font-size:24px;">{{ account.bank }}</div>
-  </div>
-  {% if recommendation %}{% if recommendation.get('error') %}
-  <div class="empty-state"><p>ML model unavailable: {{ recommendation.error[:80] }}</p></div>
-  {% else %}
-  <div class="txn-list">{% for bank, score in recommendation.banks %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ bank }}</span></div><div>{{ score }}%</div></div>{% endfor %}</div>
-  {% endif %}{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.insights') }}">Back</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Personal Models</span>
+        <h1>Bank Recommender</h1>
+        <p class="page-desc">Top 5 banks matched to your profile, scored by the model.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+{% if recommendation.error is defined %}
+<div class="callout callout--warn reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ recommendation.error }}</span>
+</div>
+{% else %}
+<div class="glass-card reveal">
+    <div class="card-head">
+        <div class="card-title">Recommended banks</div>
+        <div class="card-subtitle">Scored for your profile</div>
+    </div>
+    <div class="rank-list">
+        {% for bank, score in recommendation.banks %}
+        <div class="rank-item">
+            <span class="rank-num">{{ loop.index }}</span>
+            <span class="rank-name">{{ bank }}</span>
+            <div class="progress rank-progress"><div class="progress__bar--green" style="width:{{ score }}%"></div></div>
+            <span class="rank-score">{{ "%.1f" | format(score) }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Your profile</div>
+        <div class="card-subtitle">Features used for scoring</div>
+    </div>
+    <div class="detail-list">
+        <div class="detail-item"><span class="k">Age</span><span class="v">{{ feats.age }}</span></div>
+        <div class="detail-item"><span class="k">Income</span><span class="v">{{ feats.income_bracket | replace('_', ' ') | title }}</span></div>
+        <div class="detail-item"><span class="k">Balance</span><span class="v">₹{{ "{:,.0f}".format(feats.balance) }}</span></div>
+        <div class="detail-item"><span class="k">Current bank</span><span class="v">{{ feats.bank }}</span></div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

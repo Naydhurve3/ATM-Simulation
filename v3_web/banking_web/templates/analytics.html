@@ -1,26 +1,56 @@
 {% extends "base.html" %}
-{% block title %}Analytics - ATM Banking{% endblock %}
+{% block title %}Analytics — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>ANALYTICS</h1></div><p class="subtitle">Your personal banking analytics</p></div>
-  <div class="balance-card" style="margin-bottom:12px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div><div style="font-size:11px;color:#8899aa;">Total Spent</div><div style="font-size:18px;font-weight:700;color:#e57373;">&#8377; {{ '%.0f'|format(spending.total_spent or 0) }}</div></div>
-      <div><div style="font-size:11px;color:#8899aa;">Total Deposited</div><div style="font-size:18px;font-weight:700;color:#81c784;">&#8377; {{ '%.0f'|format(income.total_dep or 0) }}</div></div>
-      <div><div style="font-size:11px;color:#8899aa;">Spending Txns</div><div style="font-size:18px;font-weight:700;">{{ spending.txn_count or 0 }}</div></div>
-      <div><div style="font-size:11px;color:#8899aa;">Deposit Txns</div><div style="font-size:18px;font-weight:700;">{{ income.txn_count or 0 }}</div></div>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Market Intelligence</span>
+        <h1>Analytics Hub</h1>
+        <p class="page-desc">Your activity vs. the whole banking ecosystem.</p>
     </div>
-  </div>
-  <div class="action-grid">
-    <a href="{{ url_for('routes.monthly_trend') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Monthly Trend</span></a>
-    <a href="{{ url_for('routes.channel_breakdown') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Channels</span></a>
-    <a href="{{ url_for('routes.market_share') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Market Share</span></a>
-    <a href="{{ url_for('routes.growth_rate') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>Growth Rate</span></a>
-    <a href="{{ url_for('routes.user_vs_industry') }}" class="action-btn"><span class="action-icon">&#9776;</span><span>vs Industry</span></a>
-  </div>
-  {% if breakdown %}
-  <div class="recent-txns"><h3>Transaction Breakdown</h3><div class="txn-list">{% for b in breakdown %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ b.type }}</span></div><div style="text-align:right;"><div style="font-weight:600;">&#8377; {{ '%.0f'|format(b.tot) }}</div><div style="font-size:11px;color:#667788;">{{ b.cnt }} txns</div></div></div>{% endfor %}</div></div>
-  {% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
-</div>{% endblock %}
+</div>
+
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--gold reveal">
+        <span class="stat-icon">💸</span>
+        <span class="stat-label">Total spent</span>
+        <span class="stat-value">₹{{ "{:,.0f}".format(spending.total_spent) }}</span>
+        <span class="stat-sub">{{ spending.txn_count }} debit transactions</span>
+    </div>
+    <div class="glass-card stat-card stat-card--green reveal">
+        <span class="stat-icon">📥</span>
+        <span class="stat-label">Total deposited</span>
+        <span class="stat-value">₹{{ "{:,.0f}".format(income.total_dep) }}</span>
+        <span class="stat-sub">{{ income.txn_count }} credit transactions</span>
+    </div>
+</div>
+
+<div class="grid-2 mt-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Your activity mix</div>
+            <div class="card-subtitle">By transaction type</div>
+        </div>
+        <div class="gauge-wrap">
+            <canvas data-chart='{"type":"doughnut","labels":{{ breakdown | map(attribute="type") | list | tojson }},"datasets":[{"data":{{ breakdown | map(attribute="cnt") | list | tojson }},"backgroundColor":["#818cf8","#34d399","#f59e0b","#67e8f9","#a855f7","#f87171"],"borderWidth":0}]}'></canvas>
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Explore deeper</div>
+            <div class="card-subtitle">Industry &amp; personal analytics</div>
+        </div>
+        <div class="nav-grid">
+            <a class="nav-tile" href="{{ url_for('routes.monthly_trend') }}"><span class="nav-icon">📅</span><span class="nav-title">Monthly Trends</span><span class="nav-sub">Industry + your volume by month</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.channel_breakdown') }}"><span class="nav-icon">🛤️</span><span class="nav-title">Channel Breakdown</span><span class="nav-sub">ATM, UPI, web… where money moves</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.market_share') }}"><span class="nav-icon">🏆</span><span class="nav-title">Market Share</span><span class="nav-sub">Who owns the ATM network</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.growth_rate') }}"><span class="nav-icon">📈</span><span class="nav-title">Growth Rate</span><span class="nav-sub">Month-over-month expansion</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.user_vs_industry') }}"><span class="nav-icon">⚖️</span><span class="nav-title">You vs Industry</span><span class="nav-sub">Compare with peers</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.bank_overview') }}"><span class="nav-icon">🏦</span><span class="nav-title">Bank Overview</span><span class="nav-sub">Deep dive on any bank</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.bank_compare') }}"><span class="nav-icon">⚔️</span><span class="nav-title">Bank Compare</span><span class="nav-sub">Head-to-head stats</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.correlation') }}"><span class="nav-icon">🔗</span><span class="nav-title">Correlation Matrix</span><span class="nav-sub">What drives ATM volumes</span></a>
+            <a class="nav-tile" href="{{ url_for('routes.personal_analytics') }}"><span class="nav-icon">🧬</span><span class="nav-title">Personal Analytics</span><span class="nav-sub">Spend forecast + monthly trend</span></a>
+        </div>
+    </div>
+</div>
+{% endblock %}

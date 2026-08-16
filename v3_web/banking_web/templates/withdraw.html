@@ -1,23 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Withdraw - ATM Banking{% endblock %}
+{% block title %}Withdraw — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-    <div class="atm-header">
-        <div class="atm-brand">
-            <div class="atm-icon">-</div>
-            <h1>WITHDRAW</h1>
-        </div>
-        <p class="subtitle">Cash withdrawal</p>
-    </div>
-    <form method="POST" class="atm-form">
-        <div class="input-group">
-            <label for="amount">Amount (&#8377;)</label>
-            <input type="number" id="amount" name="amount" placeholder="Enter amount (multiples of 100)" min="100" step="100" required autofocus>
-        </div>
-        <button type="submit" class="atm-btn">WITHDRAW</button>
-    </form>
-    <div class="atm-footer-links">
-        <a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ATM Operations</span>
+        <h1>Withdraw Cash</h1>
+        <p class="page-desc">Amounts in multiples of ₹100. Our fraud engine watches every withdrawal.</p>
     </div>
 </div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Quick Amounts</div>
+            <div class="card-subtitle">Tap to fill the form</div>
+        </div>
+        <div class="quick-amounts">
+            {% for a in [500, 1000, 2000, 3000, 5000, 10000] %}
+            <button type="button" class="pill pill--accent qa" data-amount="{{ a }}">₹{{ a }}</button>
+            {% endfor %}
+        </div>
+        <div class="callout callout--info mt-2">
+            <span class="emoji">🛡️</span>
+            <span>Daily limit: ₹{{ "{:,.0f}".format(account.daily_limit) }} · used today: ₹{{ "{:,.0f}".format(account.used_today) }} · remaining: ₹{{ "{:,.0f}".format((account.daily_limit - account.used_today) if account.daily_limit - account.used_today > 0 else 0) }}</span>
+        </div>
+    </div>
+
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.withdraw') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">Withdrawal Form</div>
+            <div class="card-subtitle">Available: ₹{{ "{:,.2f}".format(account.balance) }}</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="amount">Amount (₹)</label>
+            <input class="form-control" type="number" name="amount" id="amount" min="100" step="100" required placeholder="e.g. 2000" autofocus>
+            <span class="form-hint">Must be a multiple of 100</span>
+        </div>
+        <div class="flex flex-wrap">
+            <button class="btn btn--primary" type="submit">Withdraw</button>
+            <a class="btn btn--ghost" href="{{ url_for('routes.balance') }}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    document.querySelectorAll('.qa').forEach(function (el) {
+        el.addEventListener('click', function () {
+            document.getElementById('amount').value = el.dataset.amount;
+        });
+    });
+</script>
 {% endblock %}

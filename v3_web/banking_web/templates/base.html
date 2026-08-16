@@ -3,25 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ATM Banking{% endblock %}</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}ATM Intelligence{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23818cf8'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23070709' font-family='monospace' font-weight='bold'%3E%E2%82%B9%3C/text%3E%3C/svg%3E">
 </head>
-<body>
-    <div class="atm-container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="flash-messages">
-            {% for category, message in messages %}
-            <div class="flash flash-{{ category }}">{{ message }}</div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
+<body data-chart-vendor="{{ url_for('static', filename='vendor/chart.umd.min.js') }}">
+
+<div class="bg-grain" aria-hidden="true"></div>
+<div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-stack">
+    {% for category, message in messages %}
+    <div class="flash flash-{{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% if session.get('user_id') %}
+{% set endpoints = {
+    'routes.dashboard': ('🏠', 'Dashboard'),
+    'routes.balance': ('💳', 'Balance'),
+    'routes.deposit': ('📥', 'Deposit'),
+    'routes.withdraw': ('📤', 'Withdraw'),
+    'routes.transfer': ('🔁', 'Transfer'),
+    'routes.statement': ('🧾', 'Statement'),
+    'routes.profile': ('👤', 'Profile'),
+    'routes.change_pin': ('🔐', 'Change PIN'),
+    'routes.analytics': ('📊', 'Analytics Home'),
+    'routes.monthly_trend': ('📈', 'Monthly Trend'),
+    'routes.channel_breakdown': ('🧮', 'Channel Breakdown'),
+    'routes.market_share': ('🥧', 'Market Share'),
+    'routes.growth_rate': ('🚀', 'Growth Rate'),
+    'routes.user_vs_industry': ('⚖️', 'User vs Industry'),
+    'routes.bank_overview': ('🏦', 'Bank Overview'),
+    'routes.bank_compare': ('🆚', 'Bank Compare'),
+    'routes.correlation': ('🔗', 'Correlation'),
+    'routes.personal_analytics': ('🧬', 'Personal Analytics'),
+    'routes.ml_credit_prediction': ('📋', 'Credit Prediction'),
+    'routes.ml_churn_analysis': ('🚩', 'Churn Analysis'),
+    'routes.ml_loan_default': ('⚠️', 'Loan Default'),
+    'routes.ml_bank_recommendation': ('⭐', 'Bank Recommendation'),
+    'routes.cash_demand': ('🏧', 'Cash Demand'),
+    'routes.txn_volume': ('🔢', 'Txn Volume'),
+    'routes.bank_clustering': ('🌀', 'Bank Clustering'),
+    'routes.anomaly_detection': ('🕵️', 'Anomaly Detection'),
+    'routes.trend_decomposition': ('📉', 'Trend Decomposition'),
+    'routes.channel_migration': ('🌊', 'Channel Migration'),
+    'routes.what_if': ('🧪', 'What-If Simulator'),
+    'routes.replenishment': ('💰', 'Replenishment'),
+    'routes.lstm_vs_prophet': ('🤖', 'LSTM vs Prophet'),
+    'routes.retrain_all': ('🔄', 'Retrain All'),
+    'routes.bank_explorer': ('🔍', 'Bank Explorer'),
+    'routes.loans': ('🏗️', 'Loans'),
+    'routes.savings': ('🐷', 'Savings Goals'),
+    'routes.savings_optimize': ('🧮', 'Savings Optimizer'),
+    'routes.credit_score': ('🎯', 'Credit Score'),
+    'routes.investment_suggestions': ('📈', 'Investments'),
+    'routes.rfm': ('🏷️', 'RFM Segmentation'),
+    'routes.reports': ('📄', 'Reports'),
+    'routes.security': ('🛡️', 'Security Center'),
+    'routes.sessions_page': ('🖥️', 'Sessions'),
+    'routes.privacy_page': ('🔒', 'Privacy'),
+    'routes.monitoring': ('💉', 'Model Monitoring'),
+    'routes.feedback': ('💬', 'Feedback'),
+    'routes.settings_page': ('⚙️', 'Settings'),
+    'routes.demo_tour': ('🎬', 'Guided Tour'),
+} %}
+{% set groups = [
+    ('Overview', ['routes.dashboard']),
+    ('Account', ['routes.balance', 'routes.deposit', 'routes.withdraw', 'routes.transfer', 'routes.statement', 'routes.profile', 'routes.change_pin']),
+    ('Analytics', ['routes.analytics', 'routes.monthly_trend', 'routes.channel_breakdown', 'routes.market_share', 'routes.growth_rate', 'routes.user_vs_industry', 'routes.bank_overview', 'routes.bank_compare', 'routes.correlation', 'routes.personal_analytics']),
+    ('ML Lab', ['routes.ml_credit_prediction', 'routes.ml_churn_analysis', 'routes.ml_loan_default', 'routes.ml_bank_recommendation', 'routes.cash_demand', 'routes.txn_volume', 'routes.bank_clustering', 'routes.anomaly_detection', 'routes.trend_decomposition', 'routes.channel_migration', 'routes.what_if', 'routes.replenishment', 'routes.lstm_vs_prophet', 'routes.retrain_all']),
+    ('Explore', ['routes.bank_explorer', 'routes.loans', 'routes.savings', 'routes.savings_optimize', 'routes.credit_score', 'routes.investment_suggestions', 'routes.rfm']),
+    ('Tools', ['routes.reports', 'routes.security', 'routes.sessions_page', 'routes.privacy_page', 'routes.monitoring', 'routes.feedback', 'routes.settings_page', 'routes.demo_tour']),
+] %}
+<div class="app-shell">
+    <div id="sidebar-overlay" class="modal-overlay" style="display:none"></div>
+    <aside class="sidebar" id="sidebar">
+        <a class="sidebar-logo" href="{{ url_for('routes.dashboard') }}">
+            <span class="logo-mark">₹</span>
+            <span class="logo-text">ATM Intelligence<small>3D Banking Suite</small></span>
+        </a>
+        {% for label, items in groups %}
+        <nav class="nav-group" aria-label="{{ label }}">
+            <div class="nav-group__label">{{ label }}</div>
+            <div class="nav-group__list">
+                {% for ep in items %}
+                <a class="nav-link{% if request.endpoint == ep %} active{% endif %}"
+                   href="{{ url_for(ep) }}">
+                    <span class="nav-icon">{{ endpoints[ep][0] }}</span>{{ endpoints[ep][1] }}
+                </a>
+                {% endfor %}
+            </div>
+        </nav>
+        {% endfor %}
+        <div style="flex:1"></div>
+        <form method="POST" action="{{ url_for('auth.logout') }}" style="padding: 0.3rem 0 0.5rem">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--ghost btn--block btn--sm" type="submit">Log out</button>
+        </form>
+    </aside>
+
+    <div class="main">
+        <header class="topbar">
+            <button class="topbar__menu" id="sidebar-open" aria-label="Open menu">☰</button>
+            <div class="topbar__title">{{ endpoints.get(request.endpoint, ('', 'Banking Suite'))[1] }}</div>
+            <div class="topbar__spacer"></div>
+            <div class="topbar__actions">
+                <button class="pill pill--accent" data-theme-toggle style="cursor:pointer" title="Toggle theme"></button>
+                <div class="user-chip">
+                    <div class="user-chip__avatar">{{ session.get('user_name', 'U')[0] | upper }}</div>
+                    <div>
+                        <div class="user-chip__name">{{ session.get('user_name', 'User') }}</div>
+                        <div class="user-chip__sub">{{ session.get('user_bank', 'Banking') }}</div>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="{{ url_for('static', filename='js/three-scene.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/cursor-effects.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</div>
+{% else %}
+    {% block auth_content %}{% endblock %}
+{% endif %}
+
+<button class="back-to-top" id="back-to-top" aria-label="Back to top">↑</button>
+
+<div class="cookie-banner" id="cookie-banner" hidden>
+    <div class="cookie-banner__text">
+        🍪 This demo uses a single session cookie to keep you signed in and a CSRF token to protect your forms.
+        <a href="{{ url_for('routes.privacy_page') }}">Learn more</a>
+    </div>
+    <button class="btn btn--primary btn--sm" id="cookie-accept" type="button">Got it</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="{{ url_for('static', filename='js/three-scene.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cursor-effects.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

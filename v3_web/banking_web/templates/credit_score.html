@@ -1,35 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Credit Score - ATM Banking{% endblock %}
+{% block title %}Credit Score — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header">
-    <div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>CREDIT SCORE</h1></div>
-    <p class="subtitle">Your credit health overview</p>
-  </div>
-  <div class="balance-card">
-    <div class="balance-label">Current Credit Score</div>
-    <div class="balance-amount">{{ account.credit_score }}</div>
-    <div style="margin-top:8px;font-size:12px;color:#667788;">
-      {% if account.credit_score >= 750 %}<span style="color:#81c784;">Excellent</span>
-      {% elif account.credit_score >= 650 %}<span style="color:#4fc3f7;">Good</span>
-      {% elif account.credit_score >= 550 %}<span style="color:#ffd54f;">Fair</span>
-      {% else %}<span style="color:#e57373;">Needs Improvement</span>{% endif %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Personal Banking</span>
+        <h1>Credit Score Breakdown</h1>
+        <p class="page-desc">See exactly what shapes your score.</p>
     </div>
-  </div>
-  {% if history %}
-  <div class="recent-txns"><h3>Score History</h3>
-    <div class="txn-list">{% for h in history %}
-      <div class="txn-item">
-        <div class="txn-info">
-          <span class="txn-type">{{ h.event_type }}</span>
-          <span class="txn-date">{{ h.recorded_at[:10] }}</span>
+    <a class="btn btn--ghost" href="{{ url_for('routes.ml_credit_prediction') }}">🤖 ML prediction →</a>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card stat-card stat-card--accent reveal">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-label">Current Score</span>
+        <span class="stat-value">{{ breakdown.total }}</span>
+        <span class="stat-sub pill {% if rating == 'Excellent' %}pill--green{% elif rating == 'Good' %}pill--info{% elif rating == 'Fair' %}pill--gold{% else %}pill--red{% endif %}">{{ rating }}</span>
+        <div class="gauge-wrap">
+            <canvas data-chart='{"type":"bar","labels":["Base","Income","Balance","Activity","Fees","Total"],"datasets":[{"label":"Score contribution","data":[{{ breakdown.base }},{{ breakdown.income }},{{ breakdown.balance }},{{ breakdown.activity }},{{ breakdown.fees }},{{ breakdown.total }}],"backgroundColor":["#818cf8","#34d399","#67e8f9","#a855f7","#f87171","#f59e0b"]}]}'></canvas>
         </div>
-        <span class="txn-amount {% if h.score_impact >= 0 %}positive{% else %}negative{% endif %}">
-          {% if h.score_impact >= 0 %}+{% endif %}{{ h.score_impact }}
-        </span>
-      </div>{% endfor %}</div>
-  </div>{% else %}
-  <div class="empty-state"><p>No credit events recorded yet.</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Score History</div>
+            <div class="card-subtitle">Last {{ history | length }} recorded changes</div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>Date</th><th>Score</th><th>Change</th></tr></thead>
+                <tbody>
+                    {% for h in history %}
+                    <tr>
+                        <td class="mono small">{{ h.recorded_at[:16] }}</td>
+                        <td class="num">{{ h.score }}</td>
+                        <td class="num">{{ "+" if h.change and h.change > 0 else "" }}{{ h.change }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3"><div class="empty-state"><div class="empty-icon">📉</div><p>No score history yet</p></div></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">How to improve</div>
+        <div class="card-subtitle">Actionable tips</div>
+    </div>
+    <ul class="flag-list">
+        <li><span class="flag-dot flag-dot--green">●</span> Make deposits — every deposit adds +2 points</li>
+        <li><span class="flag-dot flag-dot--green">●</span> Higher balances add up to +80 points</li>
+        <li><span class="flag-dot flag-dot--green">●</span> Regular transactions add up to +60 points</li>
+        <li><span class="flag-dot flag-dot--red">●</span> Fraud flags cost up to −40 points each</li>
+    </ul>
 </div>
 {% endblock %}

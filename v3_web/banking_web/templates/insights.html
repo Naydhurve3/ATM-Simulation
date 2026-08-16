@@ -1,27 +1,56 @@
 {% extends "base.html" %}
-{% block title %}ML Insights - ATM Banking{% endblock %}
+{% block title %}ML Insights — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9881;</div><h1>ML INSIGHTS</h1></div><p class="subtitle">AI-powered banking analytics</p></div>
-  <div class="action-grid">
-    <a href="{{ url_for('routes.ml_credit_prediction') }}" class="action-btn"><span class="action-icon">&#9733;</span><span>Credit Predict</span></a>
-    <a href="{{ url_for('routes.ml_churn_analysis') }}" class="action-btn"><span class="action-icon">&#9888;</span><span>Churn Risk</span></a>
-    <a href="{{ url_for('routes.ml_loan_default') }}" class="action-btn"><span class="action-icon">&#8364;</span><span>Loan Default</span></a>
-    <a href="{{ url_for('routes.ml_bank_recommendation') }}" class="action-btn"><span class="action-icon">&#127974;</span><span>Bank Rec</span></a>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-    <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Fraud Detection</div><div style="font-size:13px;color:#4fc3f7;">Real-time</div>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">AI Powered</span>
+        <h1>ML Insights Lab</h1>
+        <p class="page-desc">Twelve machine-learning models working on real bank data and your profile.</p>
     </div>
-    <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Credit Score</div><div style="font-size:13px;">{{ account.credit_score }}</div>
+</div>
+
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--accent reveal">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-label">Your credit score</span>
+        <span class="stat-value">{{ feats.credit_score }}</span>
     </div>
-    <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Balance</div><div style="font-size:13px;">&#8377; {{ '%.0f'|format(account.balance) }}</div>
+    <div class="glass-card stat-card stat-card--gold reveal">
+        <span class="stat-icon">💸</span>
+        <span class="stat-label">Balance</span>
+        <span class="stat-value">₹{{ "{:,.0f}".format(feats.balance) }}</span>
     </div>
-    <div style="padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;text-align:center;">
-      <div style="font-size:11px;color:#8899aa;">Bank</div><div style="font-size:13px;">{{ account.bank }}</div>
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">🔁</span>
+        <span class="stat-label">Transactions</span>
+        <span class="stat-value">{{ feats.txn_count }}</span>
     </div>
-  </div>
-  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
-</div>{% endblock %}
+    <div class="glass-card stat-card stat-card--green reveal">
+        <span class="stat-icon">🛡️</span>
+        <span class="stat-label">Fraud flags</span>
+        <span class="stat-value">{{ feats.fraud_count }}</span>
+    </div>
+</div>
+
+<div class="nav-grid mt-2">
+    <a class="nav-tile" href="{{ url_for('routes.ml_credit_prediction') }}"><span class="nav-icon">🎯</span><span class="nav-title">Credit Score Predictor</span><span class="nav-sub">ML prediction of your score</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.ml_churn_analysis') }}"><span class="nav-icon">📉</span><span class="nav-title">Churn Analysis</span><span class="nav-sub">Will you stay? Risk score</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.ml_loan_default') }}"><span class="nav-icon">🏗️</span><span class="nav-title">Loan Default Risk</span><span class="nav-sub">Eligibility + amortization</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.ml_bank_recommendation') }}"><span class="nav-icon">⭐</span><span class="nav-title">Bank Recommender</span><span class="nav-sub">Best bank for you</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.cash_demand') }}"><span class="nav-icon">🏧</span><span class="nav-title">Cash Demand</span><span class="nav-sub">Prophet-style ATM forecasts</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.txn_volume') }}"><span class="nav-icon">📊</span><span class="nav-title">Transaction Volume</span><span class="nav-sub">Predict industry volumes</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.bank_clustering') }}"><span class="nav-icon">🧩</span><span class="nav-title">Bank Clustering</span><span class="nav-sub">Segment banks by behaviour</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.anomaly_detection') }}"><span class="nav-icon">🚨</span><span class="nav-title">Anomaly Detection</span><span class="nav-sub">Flag unusual banks</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.trend_decomposition') }}"><span class="nav-icon">🧬</span><span class="nav-title">Trend Decomposition</span><span class="nav-sub">Trend / seasonal / residual</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.channel_migration') }}"><span class="nav-icon">🔄</span><span class="nav-title">Channel Migration</span><span class="nav-sub">Digital shift forecast</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.what_if') }}"><span class="nav-icon">🔮</span><span class="nav-title">What-If Simulator</span><span class="nav-sub">Simulate network changes</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.replenishment') }}"><span class="nav-icon">💰</span><span class="nav-title">ATM Replenishment</span><span class="nav-sub">Optimize cash loading</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.lstm_vs_prophet') }}"><span class="nav-icon">🤖</span><span class="nav-title">LSTM vs Prophet</span><span class="nav-sub">Model shootout</span></a>
+    <a class="nav-tile" href="{{ url_for('routes.retrain_all') }}"><span class="nav-icon">🔄</span><span class="nav-title">Retrain All Models</span><span class="nav-sub">Fresh training pipeline</span></a>
+</div>
+
+<div class="callout callout--info mt-2 reveal">
+    <span class="emoji">ℹ️</span>
+    <span><strong>Note:</strong> Prophet, LSTM, XGBoost and statsmodels need optional libraries. Models missing them degrade gracefully to "unavailable" states with train-first workflows.</span>
+</div>
+{% endblock %}

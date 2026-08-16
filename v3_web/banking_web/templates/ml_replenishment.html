@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}ATM Replenishment — ML Lab{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Industry Models</span>
+        <h1>ATM Replenishment Optimizer</h1>
+        <p class="page-desc">Find the optimal cash capacity and replenishment policy for an ATM.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.replenishment') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">ATM parameters</div>
+            <div class="card-subtitle">Cost optimisation inputs</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="demand">Monthly demand (₹)</label>
+            <input class="form-control" type="number" name="demand" id="demand" min="1" value="{{ demand }}">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="capacity">Cash capacity (₹)</label>
+            <input class="form-control" type="number" name="capacity" id="capacity" min="1" value="{{ capacity }}">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="cost_per_visit">Cost per visit (₹)</label>
+            <input class="form-control" type="number" name="cost_per_visit" id="cost_per_visit" min="0" value="{{ cost_per_visit }}">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="holding_pct">Holding cost (% / yr)</label>
+            <input class="form-control" type="number" name="holding_pct" id="holding_pct" min="0" max="100" step="0.5" value="{{ holding_pct }}">
+        </div>
+        <button class="btn btn--primary" type="submit">Optimize</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Optimal policy</div>
+            <div class="card-subtitle">EOQ-based model</div>
+        </div>
+        {% if result %}
+        <div class="stat-grid">
+            {% for k, v in result.items() if v is not mapping and v is not sequence %}
+            <div class="glass-card stat-card stat-card--accent">
+                <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+                <span class="stat-value" style="font-size:1rem">{{ "%.0f" | format(v) if v is number else v }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif error %}
+        <div class="callout callout--warn">
+            <span class="emoji">⚠️</span>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if comparison %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Strategy comparison</div>
+        <div class="card-subtitle">Best: {{ best_strategy }}</div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Policy</th>
+                    {% set first = comparison[0] %}
+                    {% for k in first.keys() if k != 'strategy_name' %}
+                    <th>{{ k | replace('_', ' ') | title }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in comparison %}
+                <tr>
+                    <td>{{ row.strategy_name }}</td>
+                    {% for k, v in row.items() if k != 'strategy_name' %}
+                    <td class="num">{{ "%.2f" | format(v) if v is number else v }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

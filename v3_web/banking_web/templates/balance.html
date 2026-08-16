@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Balance — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ATM Operations</span>
+        <h1>Account Balance</h1>
+        <p class="page-desc">Real-time snapshot of your account.</p>
+    </div>
+    <div class="flex flex-wrap">
+        <a class="btn btn--primary" href="{{ url_for('routes.deposit') }}">+ Deposit</a>
+        <a class="btn" href="{{ url_for('routes.withdraw') }}">− Withdraw</a>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="bank-card reveal">
+        <div class="bank-card__top">
+            <span class="bank-card__chip">◆</span>
+            <span class="pill pill--dark">{{ account.bank }}</span>
+        </div>
+        <div class="bank-card__number mono">{{ account.card_number }}</div>
+        <div class="bank-card__bottom">
+            <div>
+                <div class="bank-card__label">Card Holder</div>
+                <div class="bank-card__value">{{ account.name }}</div>
+            </div>
+            <div>
+                <div class="bank-card__label">Balance</div>
+                <div class="bank-card__value bank-card__value--accent">₹{{ "{:,.2f}".format(info.balance) }}</div>
+            </div>
+        </div>
+        <div class="bank-card__bottom mt-1">
+            <div>
+                <div class="bank-card__label">Daily limit used</div>
+                <div class="bank-card__value">{{ "{:,.0f}".format(account.used_today) }} / ₹{{ "{:,.0f}".format(account.daily_limit) }}</div>
+            </div>
+            <div>
+                <div class="bank-card__label">Credit score</div>
+                <div class="bank-card__value">{{ account.credit_score }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div>
+                <div class="card-title">Recent Transactions</div>
+                <div class="card-subtitle">Last 6 activities</div>
+            </div>
+            <a class="btn btn--ghost btn--sm" href="{{ url_for('routes.statement') }}">Statement →</a>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>When</th><th>Type</th><th>Amount</th><th>Balance</th></tr></thead>
+                <tbody>
+                    {% for t in transactions %}
+                    <tr>
+                        <td class="mono small">{{ t.timestamp[:16] }}</td>
+                        <td><span class="badge {% if t.type in ('deposit','credit') %}badge--success{% else %}badge--warn{% endif %}">{{ t.type | replace('_',' ') }}</span></td>
+                        <td class="num {{ 'pos' if t.type in ('deposit','credit') else 'neg' }}">{{ "+" if t.type in ('deposit','credit') else "−" }}₹{{ "{:,.2f}".format(t.amount) }}</td>
+                        <td class="num">₹{{ "{:,.2f}".format(t.balance_after) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4"><div class="empty-state"><div class="empty-icon">🧾</div><p>No transactions yet</p></div></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Anomaly Detection — ML Lab{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Industry Models</span>
+        <h1>Anomaly Detection</h1>
+        <p class="page-desc">Isolation-forest based flagging of unusual bank behaviour.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.anomaly_detection') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">Detection settings</div>
+            <div class="card-subtitle">Sensitivity</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="contamination">Contamination</label>
+            <input class="form-control" type="number" name="contamination" id="contamination" min="0.01" max="0.5" step="0.01" value="{{ contamination }}">
+            <span class="form-hint">Lower = stricter detection</span>
+        </div>
+        <button class="btn btn--primary" type="submit">Detect anomalies</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Flagged banks</div>
+            <div class="card-subtitle">Top 15 unusual profiles</div>
+        </div>
+        {% if flagged %}
+        <div class="rank-list">
+            {% for row in flagged %}
+            <div class="rank-item">
+                <span class="rank-num">{{ loop.index }}</span>
+                <span class="rank-name">{{ row.get('bank') or row.get('name') }}</span>
+                <span class="badge badge--red">Anomalous</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif error %}
+        <div class="callout callout--warn">
+            <span class="emoji">⚠️</span>
+            <span>{{ error }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if monthly %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Monthly anomaly count</div>
+        <div class="card-subtitle">Detection trend</div>
+    </div>
+    <div class="chart-well">
+        <canvas data-chart='{"type":"bar","labels":{{ monthly | map(attribute="month") | list | tojson }},"datasets":[{"label":"Anomalies","data":{{ monthly | map(attribute="count") | list | tojson }},"backgroundColor":"#f87171"}]}'></canvas>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

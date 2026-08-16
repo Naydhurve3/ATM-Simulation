@@ -25,7 +25,8 @@ htmlcov/
 
 # Project data & outputs (V1 owns all shared data)
 v1_banking_core/data/raw/*.csv
-v1_banking_core/data/*.db
+v1_banking_core/**/*.db
+v3_web/**/*.db
 v1_banking_core/data/processed/
 v1_banking_core/data/models/
 v1_banking_core/outputs/charts/
@@ -65,3 +66,13 @@ ATM PYTHON.py
 
 # OS files
 Desktop.ini
+
+# Local Netlify folder
+.netlify
+
+# Vercel-deployed copy of banking_core (deploy root bundle) — data artifacts stay local
+v3_web/banking_core/data/raw/
+v3_web/banking_core/data/processed/
+v3_web/banking_core/data/models/
+v3_web/banking_core/outputs/
+v3_web/banking_core/logs/

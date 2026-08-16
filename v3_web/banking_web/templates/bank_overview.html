@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Bank Overview — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>Bank Overview</h1>
+        <p class="page-desc">Deep dive into any bank's ATM footprint.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+<form class="glass-card reveal" method="get" action="{{ url_for('routes.bank_overview') }}">
+    <div class="flex flex-wrap">
+        <input class="form-control" type="text" name="bank" value="{{ bank_name }}" placeholder="Bank name">
+        <button class="btn btn--primary" type="submit">Analyse</button>
+    </div>
+</form>
+
+{% if error %}
+<div class="callout callout--warn mt-2 reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ error }}</span>
+</div>
+{% endif %}
+
+{% if overview %}
+<div class="stat-grid mt-2">
+    {% for k, v in overview.items() if v is not mapping and v is not sequence %}
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">🏦</span>
+        <span class="stat-label">{{ k | replace('_', ' ') | title }}</span>
+        <span class="stat-value" style="font-size:1.05rem">{{ v if v is not none else '—' }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

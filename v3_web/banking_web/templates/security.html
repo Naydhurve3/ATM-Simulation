@@ -1,31 +1,75 @@
 {% extends "base.html" %}
-{% block title %}Security - ATM Banking{% endblock %}
+{% block title %}Security Centre — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header">
-    <div class="atm-brand"><div class="atm-icon">&#9888;</div><h1>SECURITY</h1></div>
-    <p class="subtitle">Fraud alerts & account security</p>
-  </div>
-  <div class="action-grid" style="margin-bottom:20px;">
-    <a href="{{ url_for('routes.change_pin') }}" class="action-btn">
-      <span class="action-icon">&#9881;</span><span>Change PIN</span>
-    </a>
-    <a href="{{ url_for('routes.profile') }}" class="action-btn">
-      <span class="action-icon">&#9787;</span><span>Edit Profile</span>
-    </a>
-  </div>
-  {% if flags %}
-  <div class="recent-txns"><h3>Fraud Alerts</h3>
-    <div class="txn-list">{% for f in flags %}
-      <div class="txn-item">
-        <div class="txn-info">
-          <span class="txn-type">Anomaly Score: {{ '%.2f'|format(f.anomaly_score) }}</span>
-          <span class="txn-date">{{ f.flagged_at[:19] }}</span>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Safety First</span>
+        <h1>Security Centre</h1>
+        <p class="page-desc">Fraud flags, monitoring and tips to keep your money safe.</p>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--accent reveal">
+        <span class="stat-icon">🛡️</span>
+        <span class="stat-label">Fraud flags</span>
+        <span class="stat-value">{{ flags | length }}</span>
+        <span class="stat-sub">Last 20 flagged events</span>
+    </div>
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">🔍</span>
+        <span class="stat-label">Fraud count</span>
+        <span class="stat-value">{{ feats.fraud_count }}</span>
+        <span class="stat-sub">Lifetime suspicious events</span>
+    </div>
+    <div class="glass-card stat-card stat-card--gold reveal">
+        <span class="stat-icon">⏱️</span>
+        <span class="stat-label">Inactive days</span>
+        <span class="stat-value">{{ feats.days_inactive }}</span>
+        <span class="stat-sub">Since last activity</span>
+    </div>
+</div>
+
+<div class="grid-2 mt-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Fraud flag history</div>
+            <div class="card-subtitle">Each flag is checked by the AI fraud engine</div>
         </div>
-        <div style="font-size:11px;color:#e57373;">{{ f.flagged_by }}</div>
-      </div>{% endfor %}</div>
-  </div>{% else %}
-  <div class="empty-state"><p>No fraud alerts. Your account is secure.</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a></div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>When</th><th>Reason</th><th>Score</th></tr></thead>
+                <tbody>
+                    {% for f in flags %}
+                    <tr>
+                        <td class="mono small">{{ f.flagged_at[:16] }}</td>
+                        <td class="small">{{ f.reason | replace('_', ' ') | title }}</td>
+                        <td class="num">{{ "%.0f%%" | format((f.score or 0) * 100) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3"><div class="empty-state"><div class="empty-icon">🛡️</div><p>No fraud flags — you're all clear!</p></div></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Security checklist</div>
+            <div class="card-subtitle">Good habits</div>
+        </div>
+        <ul class="flag-list">
+            <li><span class="flag-dot flag-dot--green">●</span> Never share your PIN with anyone</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Change your PIN every few months — <a href="{{ url_for('routes.change_pin') }}">do it now</a></li>
+            <li><span class="flag-dot flag-dot--green">●</span> Use a unique password for your email</li>
+            <li><span class="flag-dot flag-dot--green">●</span> Review your statement regularly</li>
+            <li><span class="flag-dot flag-dot--red">●</span> Never respond to calls asking for your PIN/OTP</li>
+        </ul>
+        <div class="callout callout--info mt-2">
+            <span class="emoji">🤖</span>
+            <span>Our fraud engine combines rules + ML. Try <a href="{{ url_for('routes.withdraw') }}">a large withdrawal</a> to see it in action.</span>
+        </div>
+    </div>
 </div>
 {% endblock %}

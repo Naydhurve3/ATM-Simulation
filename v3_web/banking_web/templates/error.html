@@ -1,19 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Error - ATM Banking{% endblock %}
+{% block title %}{{ code }} — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-    <div class="atm-header">
-        <div class="atm-brand">
-            <div class="atm-icon">&#9888;</div>
-            <h1>ERROR</h1>
-        </div>
-        <p class="subtitle">Something went wrong</p>
-    </div>
-    <div class="empty-state">
-        <p>{{ message }}</p>
-    </div>
-    <div class="atm-footer-links">
-        <a href="{{ url_for('auth.login') }}">Back to Login</a>
+<div class="error-hero">
+    <div class="code">{{ code }}</div>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="flex">
+        <a class="btn btn--primary" href="{{ url_for('routes.dashboard') if session.get('user_id') else url_for('auth.login') }}">← Back to {{ 'dashboard' if session.get('user_id') else 'login' }}</a>
     </div>
 </div>
 {% endblock %}

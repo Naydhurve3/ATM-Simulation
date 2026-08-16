@@ -1,28 +1,88 @@
 {% extends "base.html" %}
-{% block title %}Savings Optimizer - ATM Banking{% endblock %}
+{% block title %}Savings Optimizer — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>SAVINGS OPTIMIZER</h1></div><p class="subtitle">Optimize your savings goals</p></div>
-  {% if suggestions %}
-  {% for s in suggestions %}{% if s.months_needed is defined %}
-  <div class="balance-card">
-    <div class="balance-label">Monthly Saving Capacity</div>
-    <div class="balance-amount" style="font-size:24px;">&#8377; {{ '%.0f'|format(s.monthly_available) }}</div>
-    <div style="font-size:12px;color:#667788;">Estimated time: <strong>{{ s.months_needed }} months</strong></div>
-  </div>
-  {% else %}
-  <div class="balance-card" style="margin-bottom:8px;padding:14px;">
-    <div style="display:flex;justify-content:space-between;">
-      <strong>{{ s.goal_name }}</strong><span style="color:#4fc3f7;">{{ s.progress }}%</span>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">AI Finance</span>
+        <h1>Savings Goal Optimizer</h1>
+        <p class="page-desc">ML-optimised monthly savings plan tailored to your goals and income.</p>
     </div>
-    <div style="font-size:20px;font-weight:700;">&#8377; {{ '%.0f'|format(s.current_amount) }} / &#8377; {{ '%.0f'|format(s.target_amount) }}</div>
-    {% if s.target_amount > 0 %}
-    <div style="background:rgba(255,255,255,0.1);border-radius:6px;height:6px;margin-top:6px;overflow:hidden;">
-      <div style="background:linear-gradient(90deg,#4fc3f7,#81c784);height:100%;width:{{ s.progress }}%;border-radius:6px;"></div>
-    </div>{% endif %}
-    <div style="font-size:11px;color:#4fc3f7;margin-top:4px;">Suggested: &#8377; {{ '%.0f'|format(s.suggested_monthly) }}/month</div>
-  </div>
-  {% endif %}{% endfor %}
-  {% else %}<div class="empty-state"><p>Create savings goals first to see optimization.</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.savings') }}">Back to Goals</a></div>
-</div>{% endblock %}
+    <a class="btn btn--ghost" href="{{ url_for('routes.savings') }}">← My goals</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.savings_optimize') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">Optimization inputs</div>
+            <div class="card-subtitle">Leave blank to use your profile data</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="target_amount">Target amount (₹)</label>
+            <input class="form-control" type="number" name="target_amount" id="target_amount" min="1" placeholder="e.g. 100000">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="deadline_months">Deadline (months)</label>
+            <input class="form-control" type="number" name="deadline_months" id="deadline_months" min="1" max="120" placeholder="12">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="monthly_income">Monthly income (₹)</label>
+            <input class="form-control" type="number" name="monthly_income" id="monthly_income" min="0" placeholder="Uses your bracket">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="monthly_expenses">Monthly expenses (₹)</label>
+            <input class="form-control" type="number" name="monthly_expenses" id="monthly_expenses" min="0" placeholder="0">
+        </div>
+        <button class="btn btn--primary" type="submit">Optimize now</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Your goals</div>
+            <div class="card-subtitle">Active, not yet completed</div>
+        </div>
+        {% for s in suggestions %}
+        <div class="goal-card">
+            <div class="flex" style="justify-content:space-between">
+                <span class="goal-name">{{ s.goal_name }}</span>
+                <span class="pill pill--accent">₹{{ "{:,.0f}".format(s.suggested_monthly) }}/mo</span>
+            </div>
+            <div class="progress mt-1">
+                <div class="progress__bar" style="width:{{ s.progress if s.progress <= 100 else 100 }}%"></div>
+            </div>
+            <div class="goal-meta">₹{{ "{:,.0f}".format(s.current_amount) }} of ₹{{ "{:,.0f}".format(s.target_amount) }} · {{ s.months_left }} months left</div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">🐷</div>
+            <p>No active goals — <a href="{{ url_for('routes.savings') }}">create one first</a>.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if result %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">✨ Optimization result</div>
+        <div class="card-subtitle">AI-powered plan</div>
+    </div>
+    <div class="stat-grid">
+        {% if result.monthly_saving is defined %}
+        <div class="glass-card stat-card stat-card--green"><span class="stat-icon">💰</span><span class="stat-label">Monthly saving</span><span class="stat-value">₹{{ "{:,.0f}".format(result.monthly_saving) }}</span></div>
+        {% endif %}
+        {% if result.projected_months is defined %}
+        <div class="glass-card stat-card"><span class="stat-icon">📅</span><span class="stat-label">Projected time</span><span class="stat-value">{{ result.projected_months }} mo</span></div>
+        {% endif %}
+        {% if result.savings_rate is defined %}
+        <div class="glass-card stat-card stat-card--gold"><span class="stat-icon">📊</span><span class="stat-label">Savings rate</span><span class="stat-value">{{ "%.1f" | format(result.savings_rate * 100) }}%</span></div>
+        {% endif %}
+    </div>
+    <div class="detail-list mt-2">
+        {% for k, v in result.items() if k not in ('monthly_saving', 'projected_months', 'savings_rate') and v is not mapping and v is not sequence %}
+        <div class="detail-item"><span class="k">{{ k | replace('_', ' ') | title }}</span><span class="v">{{ v }}</span></div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

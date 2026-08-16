@@ -1,12 +1,51 @@
 {% extends "base.html" %}
-{% block title %}Market Share - Analytics{% endblock %}
+{% block title %}Market Share — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>MARKET SHARE</h1></div><p class="subtitle">Bank market share analysis</p></div>
-  {% if market_share %}<div class="txn-list">{% for b in market_share %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ b.get('Bank', 'Unknown') }}</span></div><div style="font-weight:600;">{{ '%.1f'|format(b.get('Market_Share', 0)) }}%</div></div>{% endfor %}</div>
-  {% else %}<div class="empty-state"><p>RBI data not available. Install dependencies and run data ingestion first.</p></div>{% endif %}
-  {% if top_banks %}<div class="recent-txns" style="margin-top:16px;"><h3>Top Banks</h3><div class="txn-list">{% for b in top_banks %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ b.get('bank', b.get('Bank', 'Unknown')) }}</span></div><div style="font-weight:600;">{{ b.get('cnt', b.get('share', '')) }}</div></div>{% endfor %}</div></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>Market Share</h1>
+        <p class="page-desc">Who owns the ATM network — share of industry volume.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Share by bank</div>
+            <div class="card-subtitle">Industry volume distribution</div>
+        </div>
+        <div class="chart-well">
+            {% if market_share %}
+            <canvas data-chart='{"type":"doughnut","labels":{{ market_share | map(attribute="Bank_Name") | list | tojson }},"datasets":[{"data":{{ market_share | map(attribute="Total_Txn_Vol") | list | tojson }},"backgroundColor":["#818cf8","#34d399","#f59e0b","#67e8f9","#a855f7","#f87171","#fb923c","#f472b6"],"borderWidth":0}]}'></canvas>
+            {% else %}
+            <div class="empty-state"><div class="empty-icon">🏆</div><p>No industry data available</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+            <div class="card-head">
+            <div class="card-title">Top banks</div>
+            <div class="card-subtitle">Leaders by volume</div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table">
+                <thead><tr><th>#</th><th>Bank</th><th>Volume</th></tr></thead>
+                <tbody>
+                    {% for b in top_banks or [] %}
+                    <tr>
+                        <td class="muted">{{ loop.index }}</td>
+                        <td>{{ b.Bank_Name }}</td>
+                        <td class="num">₹{{ "{:,.0f}".format(b.Total_Txn_Vol) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3"><div class="empty-state"><div class="empty-icon">🏆</div><p>No data</p></div></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

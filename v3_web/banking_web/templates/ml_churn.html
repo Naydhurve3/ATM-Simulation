@@ -1,17 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Churn Analysis - ML Insights{% endblock %}
+{% block title %}Churn Analysis — ML Lab{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9888;</div><h1>CHURN ANALYSIS</h1></div><p class="subtitle">Predict your churn risk</p></div>
-  {% if churn %}{% if churn.get('error') %}
-  <div class="empty-state"><p>ML model unavailable: {{ churn.error[:80] }}</p></div>
-  {% else %}
-  <div class="balance-card">
-    <div class="balance-label">Churn Risk</div>
-    <div class="balance-amount" style="font-size:24px;">{{ '%.1f'|format(churn.churn_probability or churn.get('probability', 0) * 100) }}%</div>
-  </div>
-  <div class="txn-list">{% for k, v in churn.items() %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div>{{ v }}</div></div>{% endfor %}</div>
-  {% endif %}{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.insights') }}">Back</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Personal Models</span>
+        <h1>Churn Analysis</h1>
+        <p class="page-desc">Will you keep using this bank? The model scores your churn risk.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+{% if churn.error is defined %}
+<div class="callout callout--warn reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ churn.error }}</span>
+</div>
+{% else %}
+<div class="stat-grid">
+    <div class="glass-card stat-card {% if churn.risk_level == 'LOW' %}stat-card--green{% elif churn.risk_level == 'MEDIUM' %}stat-card--gold{% else %}stat-card--red{% endif %} reveal">
+        <span class="stat-icon">📉</span>
+        <span class="stat-label">Churn risk</span>
+        <span class="stat-value">{{ "%.1f%%" | format((churn.risk_score or 0) * 100) }}</span>
+        <span class="stat-sub">{{ churn.risk_level }} · {{ churn.method | replace('_', ' ') }}</span>
+    </div>
+    <div class="glass-card stat-card stat-card--green reveal">
+        <span class="stat-icon">🏦</span>
+        <span class="stat-label">Your bank</span>
+        <span class="stat-value" style="font-size:1rem">{{ account.bank }}</span>
+        <span class="stat-sub">Days inactive: {{ feats.days_inactive }}</span>
+    </div>
+</div>
+
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Why this score</div>
+        <div class="card-subtitle">Input features</div>
+    </div>
+    <div class="detail-list">
+        <div class="detail-item"><span class="k">Age</span><span class="v">{{ feats.age }}</span></div>
+        <div class="detail-item"><span class="k">Income</span><span class="v">{{ feats.income_bracket | replace('_', ' ') | title }}</span></div>
+        <div class="detail-item"><span class="k">Balance</span><span class="v">₹{{ "{:,.0f}".format(feats.balance) }}</span></div>
+        <div class="detail-item"><span class="k">Transactions</span><span class="v">{{ feats.txn_count }}</span></div>
+        <div class="detail-item"><span class="k">Days inactive</span><span class="v">{{ feats.days_inactive }}</span></div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

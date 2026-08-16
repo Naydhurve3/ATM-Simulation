@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Retrain All — ML Lab{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Operations</span>
+        <h1>Retrain All Models</h1>
+        <p class="page-desc">Run the full training pipeline across all 12 models. May take a few minutes.</p>
+    </div>
+</div>
+
+{% if results %}
+<div class="glass-card reveal">
+    <div class="card-head">
+        <div class="card-title">Training report</div>
+        <div class="card-subtitle">Latest run</div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Model</th><th>Status</th><th>Detail</th></tr></thead>
+            <tbody>
+                {% for name, status, detail in results %}
+                <tr>
+                    <td>{{ name }}</td>
+                    <td><span class="badge {% if status == 'Trained' %}badge--success{% elif status == 'Skipped' %}badge--warn{% else %}badge--red{% endif %}">{{ status }}</span></td>
+                    <td class="small muted">{{ detail }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="glass-card reveal">
+    <div class="card-head">
+        <div class="card-title">Ready to retrain?</div>
+        <div class="card-subtitle">Models with optional dependencies (Prophet/LSTM/XGBoost/statsmodels) will be skipped gracefully</div>
+    </div>
+    <form method="post" action="{{ url_for('routes.retrain_all') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn--primary" type="submit">▶ Start training pipeline</button>
+    </form>
+</div>
+{% endif %}
+
+<div class="callout callout--info mt-2 reveal">
+    <span class="emoji">ℹ️</span>
+    <span>Training uses the ecosystem database and <code>data/training/</code> datasets. Skipped models need optional libraries — check <a href="{{ url_for('routes.settings_page') }}">Settings</a> for the environment.</span>
+</div>
+{% endblock %}

@@ -30,16 +30,16 @@
     var ambientLight = new THREE.AmbientLight(0x404060, 0.5);
     scene.add(ambientLight);
 
-    var dirLight = new THREE.DirectionalLight(0x4fc3f7, 1.5);
+    var dirLight = new THREE.DirectionalLight(0x818cf8, 1.5);
     dirLight.position.set(5, 10, 7);
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    var fillLight = new THREE.DirectionalLight(0x0288d1, 0.6);
+    var fillLight = new THREE.DirectionalLight(0x67e8f9, 0.6);
     fillLight.position.set(-3, 2, 5);
     scene.add(fillLight);
 
-    var rimLight = new THREE.DirectionalLight(0x7c4dff, 0.4);
+    var rimLight = new THREE.DirectionalLight(0xa855f7, 0.4);
     rimLight.position.set(0, -2, -8);
     scene.add(rimLight);
 
@@ -49,7 +49,7 @@
     // Main body
     var bodyGeo = new THREE.BoxGeometry(2.2, 3.2, 1.6);
     var bodyMat = new THREE.MeshPhysicalMaterial({
-        color: 0x1a2a4a,
+        color: 0x1a1b3a,
         metalness: 0.6,
         roughness: 0.3,
         envMapIntensity: 0.5,
@@ -62,8 +62,8 @@
     // Screen (glowing blue)
     var screenGeo = new THREE.BoxGeometry(1.6, 0.9, 0.05);
     var screenMat = new THREE.MeshPhysicalMaterial({
-        color: 0x4fc3f7,
-        emissive: 0x4fc3f7,
+        color: 0x818cf8,
+        emissive: 0x818cf8,
         emissiveIntensity: 0.5,
         transparent: true,
         opacity: 0.9,
@@ -75,8 +75,8 @@
     // Screen inner
     var innerScreenGeo = new THREE.BoxGeometry(1.4, 0.7, 0.06);
     var innerScreenMat = new THREE.MeshPhysicalMaterial({
-        color: 0x0a1628,
-        emissive: 0x0a1628,
+color: 0x0d0d11,
+  emissive: 0x0d0d11,
     });
     var innerScreen = new THREE.Mesh(innerScreenGeo, innerScreenMat);
     innerScreen.position.set(0, 2.2, 0.9);
@@ -85,7 +85,7 @@
     // Keypad area
     var keypadGeo = new THREE.BoxGeometry(1.2, 0.8, 0.05);
     var keypadMat = new THREE.MeshPhysicalMaterial({
-        color: 0x0d1f3c,
+        color: 0x14143a,
         metalness: 0.3,
         roughness: 0.7,
     });
@@ -95,8 +95,8 @@
 
     // Keypad buttons (4x3 grid)
     var btnMat = new THREE.MeshPhysicalMaterial({
-        color: 0x4fc3f7,
-        emissive: 0x4fc3f7,
+        color: 0x818cf8,
+        emissive: 0x818cf8,
         emissiveIntensity: 0.15,
         transparent: true,
         opacity: 0.8,
@@ -111,22 +111,22 @@
 
     // Card slot
     var slotGeo = new THREE.BoxGeometry(0.3, 0.04, 0.15);
-    var slotMat = new THREE.MeshPhysicalMaterial({ color: 0x333355 });
+    var slotMat = new THREE.MeshPhysicalMaterial({ color: 0x2a2a4a });
     var slot = new THREE.Mesh(slotGeo, slotMat);
     slot.position.set(0.5, 0.5, 0.85);
     atmGroup.add(slot);
 
     // Cash dispenser slot
     var cashGeo = new THREE.BoxGeometry(0.8, 0.04, 0.15);
-    var cashMat = new THREE.MeshPhysicalMaterial({ color: 0x222244 });
+    var cashMat = new THREE.MeshPhysicalMaterial({ color: 0x1e1e3a });
     var cash = new THREE.Mesh(cashGeo, cashMat);
     cash.position.set(0, 0.3, 0.85);
     atmGroup.add(cash);
 
     // Glow strip around screen
     var stripMat = new THREE.MeshPhysicalMaterial({
-        color: 0x4fc3f7,
-        emissive: 0x4fc3f7,
+        color: 0x818cf8,
+        emissive: 0x818cf8,
         emissiveIntensity: 0.2,
         transparent: true,
         opacity: 0.6,
@@ -141,8 +141,8 @@
     // Brand label
     var brandGeo = new THREE.BoxGeometry(0.6, 0.12, 0.02);
     var brandMat = new THREE.MeshPhysicalMaterial({
-        color: 0x4fc3f7,
-        emissive: 0x4fc3f7,
+        color: 0x818cf8,
+        emissive: 0x818cf8,
         emissiveIntensity: 0.3,
     });
     var brand = new THREE.Mesh(brandGeo, brandMat);
@@ -188,7 +188,7 @@
     scene.add(particles);
 
     // Ground grid
-    var gridHelper = new THREE.GridHelper(20, 20, 0x4fc3f7, 0x1a2a4a);
+    var gridHelper = new THREE.GridHelper(20, 20, 0x818cf8, 0x1a2a4a);
     gridHelper.position.y = -0.2;
     gridHelper.material.transparent = true;
     gridHelper.material.opacity = 0.15;
@@ -208,11 +208,30 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // --- Animation loop ---
+    // --- Animation loop (pausable, reduced-motion aware) ---
     var clock = new THREE.Clock();
+    var running = true;
+    var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reducedMotion) {
+        running = false;
+        renderer.render(scene, camera);
+    } else {
+        var canvasEl = renderer.domElement;
+        var io = new IntersectionObserver(function (entries) {
+            running = entries[0].isIntersecting;
+            if (running) clock.getDelta();
+        }, { threshold: 0.02 });
+        io.observe(canvasEl);
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) running = false;
+            if (!document.hidden) { running = true; clock.getDelta(); }
+        });
+    }
 
     function animate() {
         requestAnimationFrame(animate);
+        if (!running) return;
         var t = clock.getElapsedTime();
 
         // Float the ATM gently

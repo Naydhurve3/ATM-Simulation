@@ -1,40 +1,69 @@
 {% extends "base.html" %}
-{% block title %}Transfer - ATM Banking{% endblock %}
+{% block title %}Transfer — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-    <div class="atm-header">
-        <div class="atm-brand">
-            <div class="atm-icon">&#8594;</div>
-            <h1>TRANSFER</h1>
-        </div>
-        <p class="subtitle">Send money to another account</p>
-    </div>
-    <form method="POST" class="atm-form">
-        <div class="input-group">
-            <label for="target_account">Target Account Number</label>
-            <input type="text" id="target_account" name="target_account" placeholder="Enter account number" required autofocus>
-        </div>
-        <div class="input-group">
-            <label for="ifsc">IFSC Code (optional)</label>
-            <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code">
-        </div>
-        <div class="input-group">
-            <label for="amount">Amount (&#8377;)</label>
-            <input type="number" id="amount" name="amount" placeholder="Enter amount" min="1" required>
-        </div>
-        <div class="input-group">
-            <label for="via">Transfer Mode</label>
-            <select id="via" name="via">
-                <option value="neft">NEFT</option>
-                <option value="imps">IMPS</option>
-                <option value="rtgs">RTGS</option>
-                <option value="upi">UPI</option>
-            </select>
-        </div>
-        <button type="submit" class="atm-btn">TRANSFER</button>
-    </form>
-    <div class="atm-footer-links">
-        <a href="{{ url_for('routes.dashboard') }}">Back to Dashboard</a>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ATM Operations</span>
+        <h1>Transfer Funds</h1>
+        <p class="page-desc">Send money via bank transfer or UPI.</p>
     </div>
 </div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Mode of transfer</div>
+            <div class="card-subtitle">Choose how you want to send</div>
+        </div>
+        <div class="mode-cards">
+            <label class="mode-card">
+                <input type="radio" name="mode" value="bank_transfer" checked>
+                <div class="mode-card__inner">
+                    <span class="mode-card__icon">🏦</span>
+                    <span class="mode-card__title">Bank Transfer</span>
+                    <span class="mode-card__sub">NEFT/IMPS style account transfer</span>
+                </div>
+            </label>
+            <label class="mode-card">
+                <input type="radio" name="mode" value="upi">
+                <div class="mode-card__inner">
+                    <span class="mode-card__icon">📱</span>
+                    <span class="mode-card__title">UPI Transfer</span>
+                    <span class="mode-card__sub">Instant, like a UPI payment</span>
+                </div>
+            </label>
+        </div>
+    </div>
+
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.transfer') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="mode" id="mode-input" value="bank_transfer">
+        <div class="card-head">
+            <div class="card-title">Transfer Form</div>
+            <div class="card-subtitle">Available: ₹{{ "{:,.2f}".format(account.balance) }}</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="target_account">Target Account</label>
+            <input class="form-control" type="text" name="target_account" id="target_account" required placeholder="e.g. 12345678">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="amount">Amount (₹)</label>
+            <input class="form-control" type="number" name="amount" id="amount" min="1" step="any" required placeholder="e.g. 500">
+        </div>
+        <div class="flex flex-wrap">
+            <button class="btn btn--primary" type="submit">Transfer</button>
+            <a class="btn btn--ghost" href="{{ url_for('routes.balance') }}">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    var modeInput = document.getElementById('mode-input');
+    document.querySelectorAll('input[name="mode"]').forEach(function (r) {
+        r.addEventListener('change', function () {
+            modeInput.value = r.value;
+        });
+    });
+</script>
 {% endblock %}

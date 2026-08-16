@@ -1,17 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Credit Prediction - ML Insights{% endblock %}
+{% block title %}Credit Score Predictor — ML Lab{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>CREDIT PREDICTION</h1></div><p class="subtitle">ML-powered credit score forecast</p></div>
-  <div class="balance-card">
-    <div class="balance-label">Current Score</div><div class="balance-amount">{{ account.credit_score }}</div>
-  </div>
-  {% if prediction %}{% if prediction.get('error') %}
-  <div class="empty-state"><p>ML model unavailable: {{ prediction.error[:80] }}</p><p style="font-size:12px;color:#667788;margin-top:8px;">Install TensorFlow/scikit-learn for full ML features.</p></div>
-  {% else %}
-  <div class="balance-card"><div class="balance-label">Predicted Score</div><div class="balance-amount" style="font-size:24px;">{{ prediction.predicted_score or prediction.get('score','N/A') }}</div></div>
-  <div class="txn-list">{% for k, v in prediction.items() %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ k }}</span></div><div>{{ v }}</div></div>{% endfor %}</div>
-  {% endif %}{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.insights') }}">Back to Insights</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">ML Lab · Personal Models</span>
+        <h1>Credit Score Predictor</h1>
+        <p class="page-desc">The model predicts your score from age, income, balance and activity.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
+</div>
+
+{% if prediction.error is defined %}
+<div class="callout callout--warn reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ prediction.error }} — showing stored score <strong>{{ prediction.fallback }}</strong></span>
+</div>
+{% else %}
+<div class="stat-grid">
+    <div class="glass-card stat-card stat-card--accent reveal">
+        <span class="stat-icon">🎯</span>
+        <span class="stat-label">Predicted score</span>
+        <span class="stat-value">{{ prediction | round(0) }}</span>
+        <span class="stat-sub">Model prediction</span>
+    </div>
+    <div class="glass-card stat-card stat-card--green reveal">
+        <span class="stat-icon">📈</span>
+        <span class="stat-label">Current stored</span>
+        <span class="stat-value">{{ account.credit_score }}</span>
+        <span class="stat-sub">Bank's record</span>
+    </div>
+</div>
+{% endif %}
+
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Features used</div>
+        <div class="card-subtitle">Real data from your profile</div>
+    </div>
+    <div class="detail-list">
+        <div class="detail-item"><span class="k">Age</span><span class="v">{{ feats.age }} ({{ feats.age_group }})</span></div>
+        <div class="detail-item"><span class="k">Income bracket</span><span class="v">{{ feats.income_bracket | replace('_', ' ') | title }}</span></div>
+        <div class="detail-item"><span class="k">Balance</span><span class="v">₹{{ "{:,.0f}".format(feats.balance) }}</span></div>
+        <div class="detail-item"><span class="k">Transaction count</span><span class="v">{{ feats.txn_count }}</span></div>
+    </div>
+</div>
+{% endblock %}

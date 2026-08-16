@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Active Sessions — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Stay In Control</span>
+        <h1>Active Sessions</h1>
+        <p class="page-desc">Every device logged into your account. Revoke anything you don't recognise.</p>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="glass-card stat-card reveal">
+        <span class="stat-icon">🖥️</span>
+        <span class="stat-label">Active sessions</span>
+        <span class="stat-value">{{ sessions | selectattr('logout_at', 'none') | list | length }}</span>
+        <span class="stat-sub">Devices currently signed in</span>
+    </div>
+    <div class="glass-card stat-card stat-card--gold reveal">
+        <span class="stat-icon">📜</span>
+        <span class="stat-label">Total sessions</span>
+        <span class="stat-value">{{ sessions | length }}</span>
+        <span class="stat-sub">Including ended ones</span>
+    </div>
+</div>
+
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Session history</div>
+        <div class="card-subtitle">Login records for your account</div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead><tr><th>Login time</th><th>Logout time</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+                {% for s in sessions %}
+                <tr>
+                    <td class="mono small">{{ s.login_at[:16] }}</td>
+                    <td class="mono small">{{ s.logout_at[:16] if s.logout_at else '—' }}</td>
+                    <td>
+                        {% if s.logout_at %}
+                        <span class="pill pill--info">Ended</span>
+                        {% elif s.is_current %}
+                        <span class="pill pill--accent">This device</span>
+                        {% else %}
+                        <span class="pill pill--green">Active</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if s.logout_at or s.is_current %}
+                        <span class="small muted">—</span>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('routes.session_revoke', sid=s.session_id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="btn btn--danger btn--sm" type="submit">Revoke</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4"><div class="empty-state"><div class="empty-icon">🖥️</div><p>No sessions recorded yet.</p></div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="mt-2">
+        <form method="POST" action="{{ url_for('routes.session_revoke_all') }}"
+              onsubmit="return confirm('Log out every device, including this one?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--danger" type="submit">Log out all devices</button>
+        </form>
+    </div>
+</div>
+
+<div class="callout callout--info mt-2 reveal">
+    <span class="emoji">🛡️</span>
+    <span>Don't recognise a session? Revoke it — that device will be logged out on its next request.</span>
+</div>
+{% endblock %}

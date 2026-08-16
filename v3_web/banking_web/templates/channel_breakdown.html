@@ -1,10 +1,42 @@
 {% extends "base.html" %}
-{% block title %}Channel Breakdown - Analytics{% endblock %}
+{% block title %}Channel Breakdown — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9776;</div><h1>CHANNELS</h1></div><p class="subtitle">How you transact</p></div>
-  {% if user_channels %}<div class="txn-list">{% for c in user_channels %}
-    <div class="txn-item"><div class="txn-info"><span class="txn-type">{{ c.channel or 'atm' }}</span></div><div style="text-align:right;"><div style="font-weight:600;">&#8377; {{ '%.0f'|format(c.tot) }}</div><div style="font-size:11px;color:#667788;">{{ c.cnt }} txns</div></div></div>{% endfor %}</div>
-  {% else %}<div class="empty-state"><p>No channel data yet.</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.analytics') }}">Back</a></div>
-</div>{% endblock %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>Channel Breakdown</h1>
+        <p class="page-desc">How money moves — industry channels vs. your own.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+<div class="grid-2">
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Industry channels</div>
+            <div class="card-subtitle">By transaction count</div>
+        </div>
+        <div class="chart-well">
+            {% if channels %}
+            <canvas data-chart='{"type":"doughnut","labels":{{ channels | map(attribute="channel") | list | tojson }},"datasets":[{"data":{{ channels | map(attribute="vol") | list | tojson }},"backgroundColor":["#818cf8","#34d399","#f59e0b","#67e8f9","#a855f7","#f87171","#fb923c"],"borderWidth":0}]}'></canvas>
+            {% else %}
+            <div class="empty-state"><div class="empty-icon">🛤️</div><p>No industry data available</p></div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Your channels</div>
+            <div class="card-subtitle">Where you transact</div>
+        </div>
+        <div class="chart-well">
+            {% if user_channels %}
+            <canvas data-chart='{"type":"bar","labels":{{ user_channels | map(attribute="channel") | list | tojson }},"datasets":[{"label":"Count","data":{{ user_channels | map(attribute="cnt") | list | tojson }},"backgroundColor":"#67e8f9"}]}'></canvas>
+            {% else %}
+            <div class="empty-state"><div class="empty-icon">🛤️</div><p>No personal data yet</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

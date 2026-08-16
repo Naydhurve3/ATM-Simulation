@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Bank Compare — ATM Intelligence{% endblock %}
+{% block content %}
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Analytics</span>
+        <h1>Bank Compare</h1>
+        <p class="page-desc">Head-to-head stats between banks.</p>
+    </div>
+    <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
+</div>
+
+<div class="flex flex-wrap reveal">
+    {% for name, banks in presets.items() %}
+    <a class="btn {% if selected == banks %}btn--primary{% else %}btn--ghost{% endif %}" href="{{ url_for('routes.bank_compare', preset=name) }}">{{ name }}</a>
+    {% endfor %}
+</div>
+
+{% if error %}
+<div class="callout callout--warn mt-2 reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ error }}</span>
+</div>
+{% endif %}
+
+{% if result %}
+<div class="glass-card mt-2 reveal">
+    <div class="card-head">
+        <div class="card-title">Comparison table</div>
+        <div class="card-subtitle">{{ selected | join(' vs ') }}</div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    {% for r in result %}
+                    <th>{{ r.get('Bank_Name') }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% set metrics = result[0].keys() | list if result else [] %}
+                {% for m in metrics if m != 'Bank_Name' %}
+                <tr>
+                    <td class="k-cell">{{ m | replace('_', ' ') | title }}</td>
+                    {% for r in result %}
+                    <td class="num">{{ "{:,.2f}".format(r[m]) if r[m] is number else r[m] }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

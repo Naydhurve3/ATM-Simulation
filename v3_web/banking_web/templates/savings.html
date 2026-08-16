@@ -1,38 +1,79 @@
 {% extends "base.html" %}
-{% block title %}Savings Goals - ATM Banking{% endblock %}
+{% block title %}Savings Goals — ATM Intelligence{% endblock %}
 {% block content %}
-<div class="screen">
-  <div class="atm-header"><div class="atm-brand"><div class="atm-icon">&#9733;</div><h1>SAVINGS GOALS</h1></div><p class="subtitle">Track your savings targets</p></div>
-  <form method="POST" class="atm-form">
-    <div class="input-group"><label>Goal Name</label><input type="text" name="goal_name" placeholder="e.g. New Car" required></div>
-    <div class="input-group"><label>Target Amount (&#8377;)</label><input type="number" name="target_amount" min="1" required></div>
-    <div class="input-group"><label>Deadline</label><input type="date" name="deadline"></div>
-    <button type="submit" class="atm-btn">CREATE GOAL</button>
-  </form>
-  <div style="text-align:right;margin-bottom:8px;"><a href="{{ url_for('routes.savings_optimize') }}" style="font-size:12px;color:#4fc3f7;">Optimize Goals &#8594;</a></div>
-  {% if goals %}{% for g in goals %}
-  <div class="balance-card" style="margin-top:8px;padding:14px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <strong>{{ g.goal_name }}</strong>
-      <div style="font-size:11px;color:#667788;">{{ g.deadline or 'No deadline' }}</div>
+<div class="page-head reveal in">
+    <div>
+        <span class="page-eyebrow">Personal Banking</span>
+        <h1>Savings Goals</h1>
+        <p class="page-desc">Plan your targets — let the optimizer tell you how much to save.</p>
     </div>
-    <div style="font-size:20px;font-weight:700;">&#8377; {{ '%.0f'|format(g.current_amount) }} / &#8377; {{ '%.0f'|format(g.target_amount) }}</div>
-    {% if g.target_amount > 0 %}
-    <div style="background:rgba(255,255,255,0.1);border-radius:6px;height:8px;margin-top:8px;overflow:hidden;">
-      <div style="background:linear-gradient(90deg,#4fc3f7,#81c784);height:100%;width:{{ (g.current_amount / g.target_amount * 100)|round }}%;border-radius:6px;"></div>
+    <a class="btn btn--primary" href="{{ url_for('routes.savings_optimize') }}">⚡ Optimize savings</a>
+</div>
+
+<div class="grid-2">
+    <form class="glass-card reveal" method="post" action="{{ url_for('routes.savings') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="card-head">
+            <div class="card-title">New Goal</div>
+            <div class="card-subtitle">What are you saving for?</div>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="goal_name">Goal name</label>
+            <input class="form-control" type="text" name="goal_name" id="goal_name" required placeholder="e.g. New bike">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="target_amount">Target amount (₹)</label>
+            <input class="form-control" type="number" name="target_amount" id="target_amount" min="100" step="100" required placeholder="e.g. 50000">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="deadline">Deadline</label>
+            <input class="form-control" type="date" name="deadline" id="deadline">
+        </div>
+        <button class="btn btn--primary" type="submit">Create goal</button>
+    </form>
+
+    <div class="glass-card reveal">
+        <div class="card-head">
+            <div class="card-title">Active Goals</div>
+            <div class="card-subtitle">{{ goals | length }} goal(s)</div>
+        </div>
+        {% for g in goals %}
+        <div class="goal-card">
+            <div class="flex" style="justify-content:space-between">
+                <div>
+                    <div class="goal-name">{{ g.goal_name }}</div>
+                    <div class="goal-meta">Target ₹{{ "{:,.0f}".format(g.target_amount) }}{% if g.deadline %} · by {{ g.deadline }}{% endif %}</div>
+                </div>
+                {% if not g.is_completed %}
+                <form method="post" action="{{ url_for('routes.savings_delete', goal_id=g.goal_id) }}" onsubmit="return confirm('Delete this goal?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn--ghost btn--sm" type="submit">✕</button>
+                </form>
+                {% endif %}
+            </div>
+            {% set pct = (g.current_amount / g.target_amount * 100) if g.target_amount else 0 %}
+            <div class="progress mt-1">
+                <div class="progress__bar{% if g.is_completed %}--green{% endif %}" style="width:{{ pct if pct <= 100 else 100 }}%"></div>
+            </div>
+            <div class="flex" style="justify-content:space-between">
+                <span class="goal-meta">₹{{ "{:,.0f}".format(g.current_amount) }} saved</span>
+                {% if not g.is_completed %}
+                <form class="flex" method="post" action="{{ url_for('routes.savings_add', goal_id=g.goal_id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input class="form-control form-control--sm" type="number" name="amount" min="1" placeholder="Add ₹" required>
+                    <button class="btn btn--sm btn--accent" type="submit">Add</button>
+                </form>
+                {% else %}
+                <span class="badge badge--success">🎉 Completed</span>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">🐷</div>
+            <p>No goals yet — create your first savings target!</p>
+        </div>
+        {% endfor %}
     </div>
-    <div style="text-align:right;font-size:11px;color:#8899aa;margin-top:4px;">{{ (g.current_amount / g.target_amount * 100)|round }}%</div>{% endif %}
-    {% if not g.is_completed %}
-    <div style="display:flex;gap:8px;margin-top:8px;">
-      <form method="POST" action="{{ url_for('routes.savings_add', goal_id=g.goal_id) }}" style="flex:1;display:flex;gap:8px;">
-        <input type="number" name="amount" placeholder="Add amount" min="1" style="flex:1;padding:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:13px;">
-        <button type="submit" class="atm-btn" style="padding:8px 12px;width:auto;font-size:11px;">ADD</button>
-      </form>
-      <form method="POST" action="{{ url_for('routes.savings_delete', goal_id=g.goal_id) }}">
-        <button type="submit" style="padding:8px;background:rgba(244,67,54,0.2);border:1px solid rgba(244,67,54,0.3);border-radius:6px;color:#e57373;font-size:11px;cursor:pointer;">DEL</button>
-      </form>
-    </div>{% endif %}
-  </div>{% endfor %}{% else %}
-  <div class="empty-state"><p>No savings goals yet. Create one above!</p></div>{% endif %}
-  <div class="atm-footer-links"><a href="{{ url_for('routes.dashboard') }}">Back</a></div>
-</div>{% endblock %}
+</div>
+{% endblock %}

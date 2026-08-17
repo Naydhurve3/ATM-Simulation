@@ -171,6 +171,15 @@ def init_db():
         return
     conn = _get_raw_conn()
     cur = conn.cursor()
+    try:
+        cur.execute("SELECT 1 FROM users LIMIT 1")
+        cur.fetchone()
+        cur.execute("SELECT 1 FROM ml_snapshots LIMIT 1")
+        cur.fetchone()
+        conn.close()
+        return
+    except Exception:
+        pass
     for stmt in _SCHEMA_SQL.split(";"):
         s = stmt.strip()
         if s:

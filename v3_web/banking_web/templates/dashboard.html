@@ -8,19 +8,13 @@
         <p class="page-desc">Your financial command centre — balance, analytics and AI insights in one place.</p>
     </div>
     <div class="flex flex-wrap">
+        <a class="btn btn--ghost" href="{{ url_for('routes.analysis_report') }}">📊 Analysis report</a>
+        <button class="btn btn--ghost" type="button" data-collapse-all="collapse">Collapse all</button>
         <a class="btn btn--primary" href="{{ url_for('routes.deposit') }}">+ Deposit</a>
         <a class="btn" href="{{ url_for('routes.withdraw') }}">− Withdraw</a>
         <a class="btn btn--ghost" href="{{ url_for('routes.transfer') }}">Transfer</a>
     </div>
 </div>
-
-{% if stale %}
-<div class="callout callout--warn mb-2">
-    <span class="emoji">🔄</span>
-    <span><strong>{{ stale | length }} model(s) stale</strong> — {{ stale | join(', ') }} need retraining.
-        <a href="{{ url_for('routes.retrain_all') }}" style="color:var(--accent);font-weight:600">Retrain now</a></span>
-</div>
-{% endif %}
 
 <div class="stat-grid">
     <div class="glass-card stat-card stat-card--accent reveal">
@@ -52,7 +46,7 @@
 </div>
 
 <div class="grid-2">
-    <div class="glass-card reveal">
+    <div class="glass-card reveal" data-collapsible data-collapse-key="dash-overview">
         <div class="card-head">
             <div>
                 <div class="card-title">Account Overview</div>
@@ -71,7 +65,7 @@
         <div class="progress mt-2"><div class="progress__bar{% if account.daily_limit and account.used_today / account.daily_limit > 0.8 %}--red{% endif %}" style="width:{{ (account.used_today / account.daily_limit * 100) if account.daily_limit else 0 }}%"></div></div>
     </div>
 
-    <div class="glass-card reveal">
+    <div class="glass-card reveal" data-collapsible data-collapse-key="dash-activity">
         <div class="card-head">
             <div>
                 <div class="card-title">Recent Activity</div>
@@ -101,7 +95,7 @@
 
 <div class="grid-2 mt-2">
     {% if churn %}
-    <div class="glass-card reveal">
+    <div class="glass-card reveal" data-collapsible data-collapse-key="dash-churn">
         <div class="card-head">
             <div>
                 <div class="card-title">Churn Risk Snapshot</div>
@@ -122,12 +116,13 @@
         </div>
     </div>
     {% endif %}
-    <div class="glass-card reveal">
+    <div class="glass-card reveal" data-collapsible data-collapse-key="dash-quick">
         <div class="card-head">
             <div>
                 <div class="card-title">Quick Insights</div>
                 <div class="card-subtitle">Shortcuts to your most-used tools</div>
             </div>
+        </div>
         </div>
         <div class="flex flex-wrap">
             <a class="pill pill--accent" href="{{ url_for('routes.credit_score') }}">🎯 Credit score</a>

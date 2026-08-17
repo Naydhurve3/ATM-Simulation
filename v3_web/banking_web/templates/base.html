@@ -9,8 +9,32 @@
     <noscript><style>.reveal{opacity:1!important;transform:none!important}.nav-group__list{display:block!important}</style></noscript>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23818cf8'/%3E%3Ctext x='50' y='68' font-size='52' text-anchor='middle' fill='%23070709' font-family='monospace' font-weight='bold'%3E%E2%82%B9%3C/text%3E%3C/svg%3E">
 </head>
-<body data-chart-vendor="{{ url_for('static', filename='vendor/chart.umd.min.js') }}">
+{% set page_theme = {
+    'routes.dashboard': 'dashboard',
+    'routes.analysis_report': 'report',
+    'routes.balance': 'atm', 'routes.deposit': 'atm', 'routes.withdraw': 'atm',
+    'routes.transfer': 'atm', 'routes.statement': 'atm',
+    'routes.profile': 'account', 'routes.change_pin': 'account', 'routes.sessions_page': 'account',
+    'routes.savings': 'account', 'routes.savings_optimize': 'account', 'routes.loans': 'account',
+    'routes.credit_score': 'account', 'routes.security': 'account',
+    'routes.analytics': 'bank', 'routes.monthly_trend': 'bank', 'routes.channel_breakdown': 'bank',
+    'routes.market_share': 'bank', 'routes.growth_rate': 'bank', 'routes.user_vs_industry': 'bank',
+    'routes.bank_overview': 'bank', 'routes.bank_compare': 'bank', 'routes.correlation': 'bank',
+    'routes.personal_analytics': 'bank', 'routes.bank_explorer': 'bank',
+    'routes.ml_credit_prediction': 'ml', 'routes.ml_churn_analysis': 'ml',
+    'routes.ml_loan_default': 'ml', 'routes.ml_bank_recommendation': 'ml',
+    'routes.cash_demand': 'ml', 'routes.txn_volume': 'ml', 'routes.bank_clustering': 'ml',
+    'routes.anomaly_detection': 'ml', 'routes.trend_decomposition': 'ml',
+    'routes.channel_migration': 'ml', 'routes.what_if': 'ml', 'routes.replenishment': 'ml',
+    'routes.lstm_vs_prophet': 'ml', 'routes.retrain_all': 'ml', 'routes.insights': 'ml',
+    'routes.rfm': 'ml', 'routes.investment_suggestions': 'ml',
+    'routes.reports': 'tools', 'routes.monitoring': 'tools', 'routes.feedback': 'tools',
+    'routes.settings_page': 'tools', 'routes.privacy_page': 'tools', 'routes.demo_tour': 'tools',
+} %}
+<body data-chart-vendor="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"
+      data-page-theme="{{ page_theme.get(request.endpoint, 'default') }}">
 
+<div class="theme-aurora" aria-hidden="true"></div>
 <div class="bg-grain" aria-hidden="true"></div>
 <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
 
@@ -89,7 +113,7 @@
     <aside class="sidebar" id="sidebar">
         <a class="sidebar-logo" href="{{ url_for('routes.dashboard') }}">
             <span class="logo-mark">₹</span>
-            <span class="logo-text">ATM Intelligence<small>3D Banking Suite</small></span>
+            <span class="logo-text">ATM Intelligence<small>Banking Suite</small></span>
         </a>
         {% for label, items in groups %}
         <nav class="nav-group" aria-label="{{ label }}">
@@ -146,11 +170,8 @@
     <button class="btn btn--primary btn--sm" id="cookie-accept" type="button">Got it</button>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="{{ url_for('static', filename='js/three-scene.js') }}"></script>
-<script src="{{ url_for('static', filename='js/cursor-effects.js') }}"></script>
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
-<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}" defer></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

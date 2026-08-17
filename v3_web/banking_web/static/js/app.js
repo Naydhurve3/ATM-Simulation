@@ -63,6 +63,71 @@
     if (topBtn) topBtn.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
   }
 
+  /* ── COLLAPSE / EXPAND CARDS ── */
+  function initCollapsibles() {
+    var els = document.querySelectorAll('[data-collapsible]');
+    if (!els.length) return;
+    var pageKey = 'atm-collapsed-' + location.pathname;
+    var collapsed = [];
+    try { collapsed = JSON.parse(sessionStorage.getItem(pageKey) || '[]'); } catch (e) {}
+
+    els.forEach(function (el, i) {
+      var head = el.querySelector('.card-head');
+      if (!head) return;
+      var body = el.querySelector(':scope > .collapse-body');
+      if (!body) {
+        body = document.createElement('div');
+        body.className = 'collapse-body';
+        Array.prototype.slice.call(el.children).forEach(function (child) {
+          if (child !== head) body.appendChild(child);
+        });
+        el.appendChild(body);
+      }
+      var toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'collapse-toggle';
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.setAttribute('title', 'Minimise / maximise');
+      toggle.textContent = '▼';
+      toggle.addEventListener('click', function () {
+        el.classList.toggle('is-collapsed');
+        var on = !el.classList.contains('is-collapsed');
+        toggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+        var key = el.dataset.collapseKey || ('card-' + i);
+        var set = new Set(JSON.parse(sessionStorage.getItem(pageKey) || '[]'));
+        if (on) set.delete(key); else set.add(key);
+        try { sessionStorage.setItem(pageKey, JSON.stringify(Array.from(set))); } catch (e) {}
+        window.dispatchEvent(new Event('atm-collapse-changed'));
+      });
+      head.appendChild(toggle);
+      head.classList.add('card-head--toggle');
+
+      if (el.dataset.collapseKey) {
+        var key = el.dataset.collapseKey;
+        if (collapsed.indexOf(key) !== -1) {
+          el.classList.add('is-collapsed');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+      }
+    });
+
+    document.querySelectorAll('[data-collapse-all]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var collapse = btn.getAttribute('data-collapse-all') === 'collapse';
+        document.querySelectorAll('[data-collapsible]').forEach(function (el) {
+          var t = el.querySelector('.collapse-toggle');
+          if (!t) return;
+          var want = collapse ? true : false;
+          if (el.classList.contains('is-collapsed') === want) return;
+          el.classList.toggle('is-collapsed', want);
+          t.setAttribute('aria-expanded', want ? 'false' : 'true');
+        });
+        try { sessionStorage.removeItem(pageKey); } catch (e) {}
+        window.dispatchEvent(new Event('atm-collapse-changed'));
+      });
+    });
+  }
+
   /* ── FLASH AUTO-DISMISS ── */
   function initFlashes() {
     document.querySelectorAll('.flash-stack .flash').forEach(function (f) {
@@ -176,6 +241,7 @@
     initSidebar();
     initScrollFx();
     initFlashes();
+    initCollapsibles();
     initReveals();
     initTilt();
     initCountUp();

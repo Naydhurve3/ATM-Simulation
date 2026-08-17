@@ -55,14 +55,17 @@ def _user():
 
 
 def _feature_context(user=None):
-    """Real user features for ML models (mirrors CLI feature mapping)."""
+    """Real user features for ML models (mirrors CLI feature mapping). Single round trip."""
     user = user or _user()
     c = _conn().cursor()
-    c.execute("SELECT COUNT(*) FROM transactions WHERE user_id=? AND type IN ('withdraw','transfer')",
-              (session["user_id"],))
-    txn_count = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM fraud_flags WHERE user_id=?", (session["user_id"],))
-    fraud_count = c.fetchone()[0]
+    c.execute(
+        "SELECT (SELECT COUNT(*) FROM transactions WHERE user_id=? AND type IN ('withdraw','transfer')),"
+        " (SELECT COUNT(*) FROM fraud_flags WHERE user_id=?)",
+        (session["user_id"], session["user_id"]),
+    )
+    row = c.fetchone()
+    txn_count = row[0] if row else 0
+    fraud_count = row[1] if row else 0
     last_active = user.get("last_active") or ""
     days_inactive = 999
     if last_active:
@@ -126,8 +129,15 @@ def _snapshot(name, bank=None, metric=None, kind="json"):
         return None
 
 
+def _user_report_read():
+    """Read the stored per-user report snapshot only — never computes."""
+    if not _USE_PG:
+        return None
+    return _snapshot(f"report_user_{session['user_id']}", kind="report")
+
+
 def _user_report():
-    """Per-user precomputed report; computes + persists on miss (write-through)."""
+    """Per-user report; computes + persists on miss (write-through, ML pages)."""
     if not _USE_PG:
         return None
     key = f"report_user_{session['user_id']}"
@@ -219,17 +229,10 @@ def dashboard():
 
     churn = _churn_snapshot()
     activity_count = ((churn or {}).get("features") or {}).get("activity_count", 0)
-
-    try:
-        from banking_core.models.model_monitor import ModelMonitor
-        from banking_core.auto_retrain import AutoRetrainScheduler
-        monitor = ModelMonitor()
-        stale = monitor.get_stale_models(max_days=7)
-    except Exception:
-        stale = []
+    rep = _user_report_read()
     return render_template("dashboard.html", account=account, transactions=transactions,
                            feats=feats, stats=stats, spend=spend, churn=churn,
-                           activity_count=activity_count, stale=stale)
+                           activity_count=activity_count, has_report=bool(rep))
 
 
 @routes_bp.route("/dashboard/churn-refresh", methods=["POST"])
@@ -238,6 +241,72 @@ def churn_refresh():
     _churn_snapshot(force=True)
     flash("Churn snapshot refreshed from your latest activity", "success")
     return redirect(url_for("routes.dashboard"))
+
+
+# ── Background analysis job (click-triggered, never auto-runs) ──
+
+def _job_name(uid):
+    return f"analysis_job_user_{uid}"
+
+
+def _job_state(uid):
+    if not _USE_PG:
+        return {"status": "none", "updated_at": None}
+    return _snapshot(_job_name(uid), kind="job") or {"status": "none", "updated_at": None}
+
+
+def _run_report_bg(uid):
+    """Daemon thread body: compute + store user report, then flip the job flag."""
+    try:
+        from banking_core.analytics.report_generator import compute_user_report, store_user_report
+        rep = compute_user_report(uid)
+        if rep:
+            store_user_report(uid, rep)
+        set_ml_snapshot(_job_name(uid), {"status": "done", "finished_at": datetime.utcnow().isoformat()[:19]},
+                        kind="job")
+    except Exception:
+        try:
+            set_ml_snapshot(_job_name(uid), {"status": "failed", "finished_at": datetime.utcnow().isoformat()[:19]},
+                            kind="job")
+        except Exception:
+            pass
+
+
+def set_ml_snapshot(name, payload, bank=None, metric=None, kind="json"):
+    from banking_core.data.postgres_adapter import set_ml_snapshot as _set
+    return _set(name, payload, bank=bank, metric=metric, kind=kind)
+
+
+@routes_bp.route("/analysis-report/run", methods=["POST"])
+@login_required
+def analysis_report_run():
+    uid = session["user_id"]
+    try:
+        set_ml_snapshot(_job_name(uid), {"status": "running", "started_at": datetime.utcnow().isoformat()[:19]},
+                        kind="job")
+        import threading
+        t = threading.Thread(target=_run_report_bg, args=(uid,), daemon=True)
+        t.start()
+        flash("Analysis started in the background — this page will refresh automatically when it's ready.", "success")
+    except Exception:
+        flash("Could not start analysis — please try again.", "error")
+    return redirect(url_for("routes.analysis_report"))
+
+
+@routes_bp.route("/analysis-report/status")
+@login_required
+def analysis_report_status():
+    state = _job_state(session["user_id"])
+    rep = _user_report_read()
+    return Response(
+        json.dumps({
+            "status": state.get("status") or "none",
+            "started_at": state.get("started_at"),
+            "finished_at": state.get("finished_at"),
+            "has_report": bool(rep),
+        }),
+        mimetype="application/json",
+    )
 
 
 # ── ATM Operations ───────────────────────────────────────────
@@ -821,6 +890,114 @@ def _da():
     return DataAnalysis()
 
 
+def _analytics_snap(name):
+    """Stored analytics payload (None when snapshot missing / non-PG mode)."""
+    return _snapshot(name, kind="report")
+
+
+def _analytics_missing(name):
+    """True when the stored snapshot should exist but does not (PG mode)."""
+    return _USE_PG and _analytics_snap(name) is None
+
+
+def _clean_py(o):
+    """JSON-safe deep copy (numpy scalars -> python, NaN/Inf -> None)."""
+    import math
+    if isinstance(o, dict):
+        return {k: _clean_py(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_clean_py(v) for v in o]
+    if not isinstance(o, (str, int, float, bool, type(None))) and hasattr(o, "item"):
+        try:
+            return _clean_py(o.item())
+        except Exception:
+            return str(o)
+    if isinstance(o, float) and (math.isnan(o) or math.isinf(o)):
+        return None
+    return o
+
+
+def _store_analytics(name, payload):
+    set_ml_snapshot(name, _clean_py(payload), kind="report")
+
+
+def _refresh_analytics(page):
+    """Recompute one analytics snapshot (click-triggered). Returns error string or None."""
+    da = _da()
+    try:
+        if page == "market-share":
+            _store_analytics("analysis_marketshare", {
+                "records": da.market_share().to_dict(orient="records"),
+                "top_banks": [{"Bank_Name": k, "Total_Txn_Vol": v}
+                              for k, v in da.top_banks(metric="Total_Txn_Vol", n=10).items()],
+            })
+        elif page == "channel":
+            cb = da.channel_breakdown()
+            _store_analytics("analysis_channel", {
+                "channels": [{"channel": k, "vol": v.get("Vol", 0), "val": v.get("Val", 0)} for k, v in cb.items()],
+            })
+        elif page == "growth":
+            gr = da.growth_rate()
+            _store_analytics("analysis_growth", {
+                "records": [{"Reporting_Month": r["Reporting_Month"], "MoM_Growth_%": r["MoM_Growth_%"]}
+                            for r in gr.to_dict(orient="records")],
+            })
+        elif page == "correlation":
+            df = da.correlation_matrix()
+            labels = [str(c) for c in df.columns]
+            _store_analytics("analysis_correlation", {
+                "labels": labels,
+                "matrix": [[None if str(c) != str(r) else round(float(df.loc[r, c]), 2)
+                            for c in df.columns] for r in df.index],
+            })
+        elif page == "monthly-trend":
+            tr = da.monthly_trend()
+            _store_analytics("analysis_monthly_trend", {
+                "records": [{"Reporting_Month": r["Reporting_Month"], "Total_Txn_Vol": int(r["Total_Txn_Vol"])}
+                            for r in tr.to_dict(orient="records")],
+            })
+        elif page == "overviews":
+            overviews = []
+            for bank in da.get_banks():
+                try:
+                    overviews.append(da.bank_overview(bank))
+                except Exception:
+                    pass
+            _store_analytics("analysis_overviews", {"banks": overviews})
+        elif page == "compare":
+            presets = {
+                "PSU": ["STATE BANK OF INDIA", "BANK OF BARODA", "PUNJAB NATIONAL BANK", "CANARA BANK"],
+                "Private": ["HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD", "KOTAK MAHINDRA BANK LTD"],
+                "Volume": ["STATE BANK OF INDIA", "HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD"],
+            }
+            out = {}
+            for preset_name, preset_banks in presets.items():
+                try:
+                    cmp_df = da.compare_banks(preset_banks)
+                    out[preset_name] = {"banks": preset_banks, "result": cmp_df.to_dict(orient="records")}
+                except Exception:
+                    pass
+            _store_analytics("analysis_compare", {"presets": out})
+        else:
+            return "Unknown page"
+        return None
+    except Exception as e:
+        return str(e)
+
+
+@routes_bp.route("/analytics/refresh", methods=["POST"])
+@login_required
+def analytics_refresh():
+    page = request.form.get("page", "")
+    err = _refresh_analytics(page)
+    if err:
+        flash(f"Could not refresh analytics data: {err}", "error")
+    else:
+        flash("Analytics data refreshed — saved as a snapshot for instant loads", "success")
+    back = request.form.get("back") or url_for("routes.analytics")
+    return redirect(back)
+
+
 @routes_bp.route("/analytics")
 @login_required
 def analytics():
@@ -844,35 +1021,46 @@ def analytics():
 @login_required
 def monthly_trend():
     industry = None
-    try:
-        df = _da().monthly_trend()
-        if df is not None and hasattr(df, "columns"):
-            industry = df.to_dict(orient="records")
-    except Exception:
-        industry = None
+    snap = _analytics_snap("analysis_monthly_trend")
+    if snap:
+        industry = snap.get("records")
+    elif not _USE_PG:
+        try:
+            df = _da().monthly_trend()
+            if df is not None and hasattr(df, "columns"):
+                industry = df.to_dict(orient="records")
+        except Exception:
+            industry = None
     c = _c()
     date_sql = "TO_CHAR(timestamp, 'YYYY-MM')" if _USE_PG else "strftime('%Y-%m', timestamp)"
     c.execute(f"""SELECT {date_sql} as month, type, SUM(amount) as total, COUNT(*) as cnt
                  FROM transactions WHERE user_id=? GROUP BY month, type ORDER BY month""", (session["user_id"],))
     cols = [d[0] for d in c.description]
     user_trends = [dict(zip(cols, r)) for r in c.fetchall()]
-    return render_template("monthly_trend.html", industry=industry, user_trends=user_trends)
+    return render_template("monthly_trend.html", industry=industry, user_trends=user_trends,
+                           missing=_analytics_missing("analysis_monthly_trend"))
 
 
 @routes_bp.route("/analytics/channel-breakdown")
 @login_required
 def channel_breakdown():
-    try:
-        raw = _da().channel_breakdown()
-        channels = [{"channel": k, "vol": v.get("Vol", 0), "val": v.get("Val", 0)} for k, v in raw.items()]
-    except Exception:
-        channels = None
+    channels = None
+    snap = _analytics_snap("analysis_channel")
+    if snap:
+        channels = snap.get("channels")
+    elif not _USE_PG:
+        try:
+            raw = _da().channel_breakdown()
+            channels = [{"channel": k, "vol": v.get("Vol", 0), "val": v.get("Val", 0)} for k, v in raw.items()]
+        except Exception:
+            channels = None
     c = _c()
     c.execute("SELECT channel, COUNT(*) as cnt, COALESCE(SUM(amount),0) as tot FROM transactions WHERE user_id=? GROUP BY channel",
               (session["user_id"],))
     cols = [d[0] for d in c.description]
     user_channels = [dict(zip(cols, r)) for r in c.fetchall()]
-    return render_template("channel_breakdown.html", channels=channels, user_channels=user_channels)
+    return render_template("channel_breakdown.html", channels=channels, user_channels=user_channels,
+                           missing=_analytics_missing("analysis_channel"))
 
 
 @routes_bp.route("/analytics/market-share")
@@ -880,31 +1068,42 @@ def channel_breakdown():
 def market_share():
     ms = None
     tb = None
-    try:
-        da = _da()
-        ms_df = da.market_share()
-        tb_series = da.top_banks()
-        if ms_df is not None and hasattr(ms_df, "columns"):
-            ms = ms_df.to_dict(orient="records")
-        if tb_series is not None and hasattr(tb_series, "items"):
-            tb = [{"Bank_Name": k, "Total_Txn_Vol": v} for k, v in tb_series.items()]
-    except Exception:
-        pass
-    return render_template("market_share.html", market_share=ms, top_banks=tb)
+    snap = _analytics_snap("analysis_marketshare")
+    if snap:
+        ms = snap.get("records")
+        tb = snap.get("top_banks")
+    elif not _USE_PG:
+        try:
+            da = _da()
+            ms_df = da.market_share()
+            tb_series = da.top_banks()
+            if ms_df is not None and hasattr(ms_df, "columns"):
+                ms = ms_df.to_dict(orient="records")
+            if tb_series is not None and hasattr(tb_series, "items"):
+                tb = [{"Bank_Name": k, "Total_Txn_Vol": v} for k, v in tb_series.items()]
+        except Exception:
+            pass
+    return render_template("market_share.html", market_share=ms, top_banks=tb,
+                           missing=_analytics_missing("analysis_marketshare"))
 
 
 @routes_bp.route("/analytics/growth-rate")
 @login_required
 def growth_rate():
     gr = None
-    try:
-        da = _da()
-        result = da.growth_rate()
-        if result is not None and hasattr(result, "columns"):
-            gr = result.to_dict(orient="records")
-    except Exception:
-        pass
-    return render_template("growth_rate.html", growth_rate=gr)
+    snap = _analytics_snap("analysis_growth")
+    if snap:
+        gr = snap.get("records")
+    elif not _USE_PG:
+        try:
+            da = _da()
+            result = da.growth_rate()
+            if result is not None and hasattr(result, "columns"):
+                gr = result.to_dict(orient="records")
+        except Exception:
+            pass
+    return render_template("growth_rate.html", growth_rate=gr,
+                           missing=_analytics_missing("analysis_growth"))
 
 
 @routes_bp.route("/analytics/user-vs-industry")
@@ -929,16 +1128,26 @@ def bank_overview():
     bank_name = request.args.get("bank", "").strip() or "STATE BANK OF INDIA"
     overview = None
     error = None
-    try:
-        da = _da()
-        available = da.get_banks()
-        if bank_name not in available:
-            bank_name = available[0] if available else "STATE BANK OF INDIA"
-        overview = da.bank_overview(bank_name)
-    except Exception as e:
-        error = str(e)
+    snap = _analytics_snap("analysis_overviews")
+    banks = snap.get("banks") if snap else None
+    if banks:
+        match = [b for b in banks if b.get("Bank") == bank_name]
+        if not match:
+            first = banks[0] if banks else {}
+            bank_name = first.get("Bank", bank_name)
+            match = [b for b in banks if b.get("Bank") == bank_name]
+        overview = match[0] if match else None
+    elif not _USE_PG:
+        try:
+            da = _da()
+            available = da.get_banks()
+            if bank_name not in available:
+                bank_name = available[0] if available else "STATE BANK OF INDIA"
+            overview = da.bank_overview(bank_name)
+        except Exception as e:
+            error = str(e)
     return render_template("bank_overview.html", bank_name=bank_name, overview=overview,
-                           error=error)
+                           error=error, missing=_analytics_missing("analysis_overviews"))
 
 
 @routes_bp.route("/analytics/compare")
@@ -961,18 +1170,27 @@ def bank_compare():
         selected = []
     result = None
     error = None
-    try:
-        da = _da()
-        available = da.get_banks()
-        selected = [b for b in selected if b in available]
-        if selected:
-            result = da.compare_banks(selected)
-            if hasattr(result, "to_dict"):
-                result = result.to_dict(orient="records")
-    except Exception as e:
-        error = str(e)
+    snap = _analytics_snap("analysis_compare")
+    presets_map = (snap or {}).get("presets") or {}
+    if snap and preset in presets_map:
+        entry = presets_map[preset]
+        result = entry.get("result")
+        selected = entry.get("banks") or selected
+    elif preset in presets and not snap:
+        pass
+    else:
+        try:
+            da = _da()
+            available = da.get_banks()
+            selected = [b for b in selected if b in available]
+            if selected:
+                result = da.compare_banks(selected)
+                if hasattr(result, "to_dict"):
+                    result = result.to_dict(orient="records")
+        except Exception as e:
+            error = str(e)
     return render_template("bank_compare.html", result=result, selected=selected,
-                           presets=presets, error=error)
+                           presets=presets, error=error, missing=_analytics_missing("analysis_compare"))
 
 
 @routes_bp.route("/analytics/correlation")
@@ -981,13 +1199,19 @@ def correlation():
     matrix = None
     labels = None
     error = None
-    try:
-        df = _da().correlation_matrix()
-        labels = [str(c) for c in df.columns]
-        matrix = [[None if str(c) != str(r) else round(float(df.loc[r, c]), 2) for c in df.columns] for r in df.index]
-    except Exception as e:
-        error = str(e)
-    return render_template("correlation.html", matrix=matrix, labels=labels, error=error)
+    snap = _analytics_snap("analysis_correlation")
+    if snap:
+        matrix = snap.get("matrix")
+        labels = snap.get("labels")
+    elif not _USE_PG:
+        try:
+            df = _da().correlation_matrix()
+            labels = [str(c) for c in df.columns]
+            matrix = [[None if str(c) != str(r) else round(float(df.loc[r, c]), 2) for c in df.columns] for r in df.index]
+        except Exception as e:
+            error = str(e)
+    return render_template("correlation.html", matrix=matrix, labels=labels, error=error,
+                           missing=_analytics_missing("analysis_correlation"))
 
 
 @routes_bp.route("/analytics/personal")
@@ -1030,9 +1254,9 @@ def personal_analytics():
 @routes_bp.route("/analysis-report")
 @login_required
 def analysis_report():
-    """Instant precomputed report: personal + industry, zero live model training."""
+    """Click-triggered report: reads stored snapshots only; runs only via /analysis-report/run."""
     account = _acct()
-    rep = _user_report() or {}
+    rep = _user_report_read()
     industry = _snapshot("analysis_report", kind="report") or {}
     if request.args.get("format") == "json":
         payload = {"personal": rep, "industry": industry}
@@ -1041,7 +1265,8 @@ def analysis_report():
             mimetype="application/json",
             headers={"Content-Disposition": 'attachment; filename="analysis_report.json"'},
         )
-    return render_template("analysis_report.html", account=account, rep=rep, industry=industry)
+    return render_template("analysis_report.html", account=account, rep=rep, industry=industry,
+                           job=_job_state(session["user_id"]))
 
 
 # ── ML Insights Hub ──────────────────────────────────────────

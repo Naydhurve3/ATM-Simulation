@@ -10,6 +10,19 @@
     <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
 </div>
 
+{% if missing %}
+<div class="callout callout--warn mt-2 reveal">
+    <span class="emoji">🔄</span>
+    <span>Industry analytics are not computed yet. Click <strong>Refresh data</strong> to build the snapshot once — it is saved and served instantly afterwards.</span>
+    <form method="post" action="{{ url_for('routes.analytics_refresh') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="page" value="channel">
+        <input type="hidden" name="back" value="{{ request.full_path }}">
+        <button class="btn btn--primary btn--sm" type="submit">↻ Refresh data</button>
+    </form>
+</div>
+{% endif %}
+
 <div class="grid-2">
     <div class="glass-card reveal">
         <div class="card-head">

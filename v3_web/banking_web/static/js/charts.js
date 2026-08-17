@@ -57,6 +57,9 @@
     /* Build a Chart from a config object stored in data-chart JSON. */
     initAll: function () {
       document.querySelectorAll('[data-chart]').forEach(function (el) {
+        if (el.getAttribute('data-chart-init')) return;
+        if (el.closest('.collapsible.is-collapsed')) return;
+        if (el.offsetParent === null && !document.body.contains(el)) return;
         var spec;
         try { spec = JSON.parse(el.getAttribute('data-chart')); } catch (e) { return; }
         var ctx = el.getContext('2d');
@@ -68,6 +71,7 @@
           return Object.assign({}, d, { borderColor: c, backgroundColor: d.backgroundColor || (spec.type === 'line' ? ATMCharts.alpha(c, 0.15) : c) });
         });
         new Chart(ctx, { type: spec.type || 'bar', data: { labels: spec.labels || [], datasets: ds }, options: opts });
+        el.setAttribute('data-chart-init', '1');
       });
     }
   };
@@ -94,6 +98,9 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     if (!document.querySelector('[data-chart]')) return;
-    loadChart().then(function () { ATMCharts.initAll(); }).catch(function () {});
+    loadChart().then(function () {
+      ATMCharts.initAll();
+      document.addEventListener('atm-collapse-changed', function () { ATMCharts.initAll(); });
+    }).catch(function () {});
   });
 })();

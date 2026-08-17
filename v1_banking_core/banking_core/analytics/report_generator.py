@@ -462,13 +462,48 @@ def compute_global_report(top_banks_n=3, trend_metric="DC_Vol_Cash_ATM"):
             "matrix": [[None if str(c) != str(r) else round(float(corr.loc[r, c]), 2)
                         for c in corr.columns] for r in corr.index],
         }
+        ms_df = da.market_share()
+        report["market_share_records"] = ms_df.to_dict(orient="records")
+        report["top_banks_records"] = [
+            {"Bank_Name": k, "Total_Txn_Vol": v} for k, v in da.top_banks(metric="Total_Txn_Vol", n=10).items()
+        ]
+        cb = da.channel_breakdown()
+        report["channel_records"] = [
+            {"channel": k, "vol": v.get("Vol", 0), "val": v.get("Val", 0)} for k, v in cb.items()
+        ]
+        gr_df = da.growth_rate()
+        report["growth_records"] = [
+            {"Reporting_Month": r["Reporting_Month"],
+             "MoM_Growth_%": None if pd.isna(r["MoM_Growth_%"]) else round(float(r["MoM_Growth_%"]), 2)}
+            for r in gr_df.to_dict(orient="records")
+        ]
+        trend_df = da.monthly_trend()
+        report["monthly_trend_records"] = [
+            {"Reporting_Month": r["Reporting_Month"], "Total_Txn_Vol": int(r["Total_Txn_Vol"])}
+            for r in trend_df.to_dict(orient="records")
+        ]
         overviews = []
-        for bank in banks[:5]:
+        for bank in da.get_banks():
             try:
                 overviews.append(da.bank_overview(bank))
             except Exception:
                 pass
         report["overviews"] = overviews
+        compare_presets = {
+            "PSU": ["STATE BANK OF INDIA", "BANK OF BARODA", "PUNJAB NATIONAL BANK", "CANARA BANK"],
+            "Private": ["HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD", "KOTAK MAHINDRA BANK LTD"],
+            "Volume": ["STATE BANK OF INDIA", "HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD"],
+        }
+        report["compare"] = {}
+        for preset_name, preset_banks in compare_presets.items():
+            try:
+                cmp_df = da.compare_banks(preset_banks)
+                report["compare"][preset_name] = {
+                    "banks": preset_banks,
+                    "result": cmp_df.to_dict(orient="records"),
+                }
+            except Exception:
+                pass
     except Exception as e:
         report["analytics_error"] = str(e)
 
@@ -494,12 +529,27 @@ def store_global_report(report, top_banks_n=3):
         stored.append(_set("analysis_replenishment", report["replenishment"], kind="report"))
     if report.get("market_share"):
         stored.append(_set("analysis_marketshare", report["market_share"], kind="report"))
+    if report.get("market_share_records"):
+        stored.append(_set("analysis_marketshare", {
+            "records": report["market_share_records"],
+            "top_banks": report.get("top_banks_records", []),
+        }, kind="report"))
     if report.get("channel_breakdown"):
         stored.append(_set("analysis_channel", report["channel_breakdown"], kind="report"))
+    if report.get("channel_records"):
+        stored.append(_set("analysis_channel", {"channels": report["channel_records"]}, kind="report"))
     if report.get("growth"):
         stored.append(_set("analysis_growth", report["growth"], kind="report"))
+    if report.get("growth_records"):
+        stored.append(_set("analysis_growth", {"records": report["growth_records"]}, kind="report"))
     if report.get("correlation"):
         stored.append(_set("analysis_correlation", report["correlation"], kind="report"))
+    if report.get("monthly_trend_records"):
+        stored.append(_set("analysis_monthly_trend", {"records": report["monthly_trend_records"]}, kind="report"))
+    if report.get("overviews"):
+        stored.append(_set("analysis_overviews", {"banks": report["overviews"]}, kind="report"))
+    if report.get("compare"):
+        stored.append(_set("analysis_compare", {"presets": report["compare"]}, kind="report"))
     if report.get("whatif"):
         stored.append(_set("analysis_whatif", report["whatif"], kind="baseline"))
     for t in report.get("trend", []):

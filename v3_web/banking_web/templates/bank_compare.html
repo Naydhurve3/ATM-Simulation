@@ -23,6 +23,19 @@
 </div>
 {% endif %}
 
+{% if missing %}
+<div class="callout callout--warn mt-2 reveal">
+    <span class="emoji">🔄</span>
+    <span>Compare snapshots are not computed yet. Click <strong>Refresh data</strong> to precompute the PSU / Private / Volume presets once — they are saved and served instantly afterwards.</span>
+    <form method="post" action="{{ url_for('routes.analytics_refresh') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="page" value="compare">
+        <input type="hidden" name="back" value="{{ request.full_path }}">
+        <button class="btn btn--primary btn--sm" type="submit">↻ Refresh data</button>
+    </form>
+</div>
+{% endif %}
+
 {% if result %}
 <div class="glass-card mt-2 reveal">
     <div class="card-head">

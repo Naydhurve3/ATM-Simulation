@@ -285,6 +285,50 @@ class TestExports:
         assert resp.status_code in (200, 302)
 
 
+class TestClickDriven:
+    def test_dashboard_has_report_button_and_no_stale_banner(self, client, logged_in):
+        resp = client.get("/dashboard")
+        assert resp.status_code == 200
+        assert b"Analysis report" in resp.data
+        assert b"Collapse all" in resp.data
+        assert b"model(s) stale" not in resp.data
+
+    def test_report_page_shows_analyse_button(self, client, logged_in):
+        resp = client.get("/analysis-report")
+        assert resp.status_code == 200
+        assert b"Analyse my account" in resp.data
+        assert b"Download JSON" in resp.data
+
+    def test_report_run_starts_background_job(self, client, logged_in):
+        token = get_token(client, "/analysis-report")
+        resp = client.post("/analysis-report/run", data={"csrf_token": token},
+                           follow_redirects=True)
+        assert resp.status_code == 200
+        assert b"Analysis started" in resp.data
+
+    def test_report_status_endpoint(self, client, logged_in):
+        resp = client.get("/analysis-report/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] in ("none", "running", "done", "failed")
+        assert "has_report" in data
+
+    def test_analytics_pages_render(self, client, logged_in):
+        for path in ("/analytics/monthly-trend", "/analytics/channel-breakdown",
+                     "/analytics/market-share", "/analytics/growth-rate",
+                     "/analytics/correlation", "/analytics/bank-overview",
+                     "/analytics/compare", "/analytics/compare?preset=PSU"):
+            resp = client.get(path)
+            assert resp.status_code == 200, f"{path} -> {resp.status_code}"
+
+    def test_analytics_refresh_route(self, client, logged_in):
+        token = get_token(client, "/analytics/market-share")
+        resp = client.post("/analytics/refresh", data={"csrf_token": token, "page": "market-share"},
+                           follow_redirects=True)
+        assert resp.status_code == 200
+        assert b"refreshed" in resp.data or b"Could not refresh" in resp.data
+
+
 class TestChurnSnapshot:
     def test_dashboard_shows_churn_card(self, client, logged_in):
         resp = client.get("/dashboard")

@@ -17,25 +17,50 @@
         <span class="page-eyebrow">Instant Intelligence</span>
         <h1>Analysis Report</h1>
         <p class="page-desc">
-            One-click, precomputed summary — your personal banking profile and the full industry picture.
-            No live model training: everything below was calculated once and is served instantly.
+            Your personal banking profile and the full industry picture — analysed in the
+            background the moment you ask, then served instantly.
         </p>
         <div class="report-meta">
             {% if industry.generated_at %}<span class="chip">Industry data: {{ industry.generated_at[:10] }}</span>{% endif %}
             {% if rep.generated_at %}<span class="chip">Personal data: {{ rep.generated_at[:10] }}</span>{% endif %}
             {% if industry.summary and industry.summary.banks %}<span class="chip">{{ industry.summary.banks }} banks · {{ industry.summary.months }} months · {{ industry.summary.rows }} rows</span>{% endif %}
+            <span class="chip" id="job-chip" data-status="{{ job.status or 'none' }}">
+                {% if job.status == 'running' %}⏳ Analysis running…{% elif job.status == 'failed' %}⚠️ Last analysis failed{% else %}⚡ Ready — instant{% endif %}
+            </span>
         </div>
     </div>
-    <div class="report-actions">
+    <div class="report-actions flex flex-wrap">
+        {% if rep %}
+        <form method="post" action="{{ url_for('routes.analysis_report_run') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--primary" type="submit" id="run-btn">↻ Reprocess my report</button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('routes.analysis_report_run') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn--primary" type="submit" id="run-btn">🔍 Analyse my account</button>
+        </form>
+        {% endif %}
         <a class="btn btn--ghost" href="{{ url_for('routes.analysis_report', format='json') }}">Download JSON</a>
-        <button class="btn btn--primary" type="button" onclick="window.print()">Print / PDF</button>
+        <button class="btn btn--ghost" type="button" onclick="window.print()">Print / PDF</button>
+        <button class="btn btn--ghost" type="button" data-collapse-all="collapse">Collapse all</button>
     </div>
 </div>
 
-{% if not rep and not industry.summary %}
-<div class="callout callout--warn">
+{% if job.status == 'running' %}
+<div class="callout callout--info" id="job-callout">
+    <span class="emoji">⏳</span>
+    <span><strong>Analysing your account in the background…</strong> This takes about half a minute and keeps running while you browse. This page will refresh automatically when it's ready.</span>
+</div>
+{% elif job.status == 'failed' %}
+<div class="callout callout--danger">
     <span class="emoji">⚠️</span>
-    <span>Report snapshots are not available yet. Run <code>python v3_web/scripts/precompute_analysis.py</code> against Neon, or visit any ML page once to generate your personal snapshot.</span>
+    <span>The last analysis attempt was interrupted. Click <strong>Analyse my account</strong> to try again.</span>
+</div>
+{% elif not rep and not industry.summary %}
+<div class="callout callout--warn">
+    <span class="emoji">⚡</span>
+    <span>Nothing has been analysed yet. Click <strong>Analyse my account</strong> — the analysis runs in the background and this page refreshes when it's done.</span>
 </div>
 {% endif %}
 
@@ -58,7 +83,7 @@
 </div>
 
 <div class="grid-2">
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-credit">
         <div class="card-head"><div class="card-title">Credit score</div>
             <span class="badge badge--{{ 'ok' if rep.credit.rating in ('Excellent','Good') else 'warn' }}">{{ rep.credit.rating }}</span></div>
         <div class="flex" style="align-items:center; gap:1.2rem">
@@ -72,7 +97,7 @@
         </div>
     </div>
 
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-churn">
         <div class="card-head"><div class="card-title">Churn risk</div></div>
         <div class="flex" style="align-items:center; gap:1.2rem">
             <canvas height="130" data-chart='{"type":"doughnut","labels":["Risk","Headroom"],"datasets":[{"data":[{{ (rep.churn.risk_score or 0) * 100 }},{{ 100 - (rep.churn.risk_score or 0) * 100 }}],"backgroundColor":["{% if rep.churn.risk_level == 'LOW' %}#34d399{% elif rep.churn.risk_level == 'MEDIUM' %}#f59e0b{% else %}#ef4444{% endif %}","#26263a"],"borderWidth":0}]}'></canvas>
@@ -85,7 +110,7 @@
 </div>
 
 <div class="grid-2">
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-loan">
         <div class="card-head"><div class="card-title">Loan eligibility</div></div>
         {% if rep.loan.result %}
         <div class="detail-list">
@@ -98,7 +123,7 @@
         {% else %}<div class="card-subtitle">No loan snapshot available.</div>{% endif %}
     </div>
 
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-rfm">
         <div class="card-head"><div class="card-title">RFM segment</div></div>
         {% if rep.rfm %}
         <div class="detail-list">
@@ -113,11 +138,11 @@
 
 {% if rep.investments and rep.investments.products %}
 <div class="grid-2">
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-invest">
         <div class="card-head"><div class="card-title">Investment allocation</div></div>
         <canvas height="220" data-chart='{"type":"doughnut","labels":{{ rep.investments.products | map(attribute="category") | list | tojson }},"datasets":[{"data":{{ rep.investments.products | map(attribute="allocation_pct") | list | tojson }},"borderWidth":0}]}'></canvas>
     </div>
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-forecast">
         <div class="card-head"><div class="card-title">Spending forecast</div></div>
         {% if rep.forecast and rep.forecast.predicted_monthly_spend %}
         <div class="detail-list">
@@ -140,7 +165,7 @@
 {% endif %}
 
 {% if rep.savings and rep.savings.suggestions %}
-<div class="glass-card reveal in">
+<div class="glass-card reveal in" data-collapsible data-collapse-key="rep-savings">
     <div class="card-head"><div class="card-title">Savings plan</div>
         <div class="card-subtitle">₹{{ "{:,.0f}".format(rep.savings.total_current) }} of ₹{{ "{:,.0f}".format(rep.savings.total_target) }}</div></div>
     {% for g in rep.savings.suggestions %}
@@ -174,11 +199,11 @@
 
 {% if industry.market_share %}
 <div class="grid-2">
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-market">
         <div class="card-head"><div class="card-title">Market share (ATM cash volume)</div></div>
         <canvas height="240" data-chart='{"type":"doughnut","labels":{{ industry.market_share.labels | tojson }},"datasets":[{"data":{{ industry.market_share["values"] | tojson }},"borderWidth":0}]}'></canvas>
     </div>
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-channel">
         <div class="card-head"><div class="card-title">Channel mix</div></div>
         <canvas height="240" data-chart='{"type":"bar","labels":{{ industry.channel_breakdown.labels | tojson }},"datasets":[{"label":"Volume","data":{{ industry.channel_breakdown["values"] | tojson }},"backgroundColor":"#818cf8","borderRadius":6}]}'></canvas>
     </div>
@@ -186,7 +211,7 @@
 {% endif %}
 
 {% if industry.trend %}
-<div class="glass-card reveal in">
+<div class="glass-card reveal in" data-collapsible data-collapse-key="rep-trend">
     <div class="card-head"><div class="card-title">Trend decomposition — {{ industry.trend[0].metric }}</div>
         <div class="card-subtitle">observed vs trend (top banks)</div></div>
     {% for t in industry.trend %}
@@ -199,7 +224,7 @@
 
 {% if industry.clustering %}
 <div class="grid-2">
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-clusters">
         <div class="card-head"><div class="card-title">Bank clusters (k-means)</div>
             <div class="card-subtitle">k = {{ industry.clustering.profiles | length if industry.clustering.profiles else 4 }}{% if industry.clustering.optimal_k %} · optimal k = {{ industry.clustering.optimal_k }}{% endif %}</div></div>
         {% for cidx, cluster in (industry.clustering.profiles or {}).items() %}
@@ -215,7 +240,7 @@
         </div>
         {% endfor %}
     </div>
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-anomaly">
         <div class="card-head"><div class="card-title">Anomaly watch</div></div>
         {% if industry.anomaly and industry.anomaly.flagged %}
         <div class="detail-list">
@@ -252,7 +277,7 @@
         </div>
     </div>
     {% endfor %}
-    <div class="glass-card reveal in">
+    <div class="glass-card reveal in" data-collapsible data-collapse-key="rep-whatif">
         <div class="card-head"><div class="card-title">What-if baseline</div></div>
         {% if industry.whatif and not industry.whatif.error %}
         <div class="detail-list">
@@ -265,7 +290,7 @@
 {% endif %}
 
 {% if industry.correlation %}
-<div class="glass-card reveal in">
+<div class="glass-card reveal in" data-collapsible data-collapse-key="rep-corr">
     <div class="card-head"><div class="card-title">Correlation matrix (first 6 metrics)</div>
         <a class="btn btn--ghost btn--sm" href="{{ url_for('routes.correlation') }}">Full matrix</a></div>
     <div class="table-wrap">
@@ -286,7 +311,7 @@
 {% endif %}
 
 {% if industry.growth %}
-<div class="glass-card reveal in">
+<div class="glass-card reveal in" data-collapsible data-collapse-key="rep-growth">
     <div class="card-head"><div class="card-title">Industry growth (MoM, %)</div></div>
     <canvas height="200" data-chart='{"type":"line","labels":{{ industry.growth.months | tojson }},"datasets":[{"label":"MoM growth %","data":{{ industry.growth["values"] | tojson }},"borderColor":"#f59e0b","backgroundColor":"transparent","tension":0.3}]}'></canvas>
 </div>
@@ -295,7 +320,7 @@
 {% if industry.overviews %}
 <h2 class="section-title">Top bank snapshots</h2>
 <div class="grid-3">
-    {% for ov in industry.overviews %}
+    {% for ov in industry.overviews[:6] %}
     <div class="glass-card reveal in">
         <div class="card-head"><div class="card-title">{{ ov.Bank }}</div><div class="card-subtitle">{{ ov.Type }}</div></div>
         <div class="detail-list">
@@ -308,4 +333,46 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    'use strict';
+    var status = '{{ job.status or "none" }}';
+    var polls = 0;
+    var MAX_POLLS = 60;
+    if (status === 'running') {
+        var btn = document.getElementById('run-btn');
+        if (btn) btn.disabled = true;
+        var timer = setInterval(function () {
+            polls += 1;
+            fetch('{{ url_for("routes.analysis_report_status") }}', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.status === 'done') {
+                        clearInterval(timer);
+                        location.reload();
+                    } else if (d.status === 'failed') {
+                        clearInterval(timer);
+                        var chip = document.getElementById('job-chip');
+                        if (chip) { chip.textContent = '⚠️ Last analysis failed'; chip.setAttribute('data-status', 'failed'); }
+                        var call = document.getElementById('job-callout');
+                        if (call) {
+                            call.className = 'callout callout--danger';
+                            call.innerHTML = '<span class="emoji">⚠️</span><span>The analysis was interrupted. Click <strong>Analyse my account</strong> to try again.</span>';
+                        }
+                        if (btn) btn.disabled = false;
+                    } else if (polls >= MAX_POLLS) {
+                        clearInterval(timer);
+                        var call2 = document.getElementById('job-callout');
+                        if (call2) call2.innerHTML = '<span class="emoji">🔄</span><span>Still running… if this page doesn\'t refresh in a minute, click <strong>Analyse my account</strong> once more.</span>';
+                        if (btn) btn.disabled = false;
+                    }
+                })
+                .catch(function () { /* network hiccup — keep polling */ });
+        }, 5000);
+    }
+})();
+</script>
 {% endblock %}

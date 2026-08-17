@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_compute_card.html" import compute_card %}
 {% block title %}Personal Analytics — ATM Intelligence{% endblock %}
 {% block content %}
 <div class="page-head reveal in">
@@ -59,7 +60,7 @@
             <span>{{ error }}</span>
         </div>
         {% else %}
-        <div class="empty-state"><div class="empty-icon">🔮</div><p>Not enough data yet</p></div>
+        {{ compute_card(url_for('routes.personal_analytics'), "Generate spend forecast", "Runs the model on your live data when you click — nothing is precomputed or stored.") }}
         {% endif %}
     </div>
 </div>

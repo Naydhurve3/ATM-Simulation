@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_compute_card.html" import compute_card %}
 {% block title %}Churn Analysis — ML Lab{% endblock %}
 {% block content %}
 <div class="page-head reveal in">
@@ -10,12 +11,12 @@
     <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
 </div>
 
-{% if churn.error is defined %}
+{% if churn and churn.error is defined %}
 <div class="callout callout--warn reveal">
     <span class="emoji">⚠️</span>
     <span>{{ churn.error }}</span>
 </div>
-{% else %}
+{% elif churn %}
 <div class="stat-grid">
     <div class="glass-card stat-card {% if churn.risk_level == 'LOW' %}stat-card--green{% elif churn.risk_level == 'MEDIUM' %}stat-card--gold{% else %}stat-card--red{% endif %} reveal">
         <span class="stat-icon">📉</span>
@@ -44,5 +45,7 @@
         <div class="detail-item"><span class="k">Days inactive</span><span class="v">{{ feats.days_inactive }}</span></div>
     </div>
 </div>
+{% else %}
+{{ compute_card(url_for('routes.ml_churn_analysis'), "Run churn analysis", "Runs the model on your live profile when you click — nothing is precomputed or stored.") }}
 {% endif %}
 {% endblock %}

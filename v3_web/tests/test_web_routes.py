@@ -321,16 +321,24 @@ class TestClickDriven:
             resp = client.get(path)
             assert resp.status_code == 200, f"{path} -> {resp.status_code}"
 
-    def test_analytics_refresh_route(self, client, logged_in):
+    def test_analytics_compute_on_click(self, client, logged_in):
         token = get_token(client, "/analytics/market-share")
-        resp = client.post("/analytics/refresh", data={"csrf_token": token, "page": "market-share"},
+        resp = client.post("/analytics/market-share", data={"csrf_token": token},
                            follow_redirects=True)
         assert resp.status_code == 200
-        assert b"refreshed" in resp.data or b"Could not refresh" in resp.data
+        assert b"Compute market share" not in resp.data
+        assert b"Share by bank" in resp.data
+
+    def test_analytics_pages_show_compute_card_without_data(self, client, logged_in):
+        resp = client.get("/analytics/growth-rate")
+        assert resp.status_code == 200
+        assert b"Compute growth rate" in resp.data
 
 
 class TestChurnSnapshot:
-    def test_dashboard_shows_churn_card(self, client, logged_in):
+    def test_dashboard_shows_churn_card_after_refresh(self, client, logged_in):
+        token = get_token(client, "/dashboard")
+        client.post("/dashboard/churn-refresh", data={"csrf_token": token})
         resp = client.get("/dashboard")
         assert resp.status_code == 200
         assert b"Churn Risk Snapshot" in resp.data

@@ -1,18 +1,12 @@
-"""Offline analysis report generator (runs locally / CI, never on serverless).
+"""Offline analysis report generator.
 
 Computes chart-ready JSON for the One-Click Analysis Report page and per-user
-ML snapshots, then stores them in the Neon `ml_snapshots` table via
-`set_ml_snapshot`. The web app only reads these JSONB payloads at request
-time, so a page load costs a JSON read instead of training models.
+ML results. Compute-on-demand only — the web app runs these functions in a
+background thread when the user clicks a button; nothing is stored.
 
 Entry points:
     compute_global_report(top_banks_n=3)  -> dict (industry-wide report)
     compute_user_report(user_id)          -> dict (personalized report)
-    store_global_report(...)              -> writes granular + combined snapshots
-    store_user_report(user_id)            -> writes report_user_<id>
-
-The web routes in PG mode read these snapshots; on a miss they compute the
-report once (write-through) so every later visit is instant.
 """
 import json
 from datetime import datetime, timezone
@@ -509,56 +503,3 @@ def compute_global_report(top_banks_n=3, trend_metric="DC_Vol_Cash_ATM"):
 
     report["generated_at"] = datetime.now(timezone.utc).isoformat()
     return _jsonable(report)
-
-
-# ── Storage helpers ──────────────────────────────────────────
-
-def _set(name, payload, bank=None, metric=None, kind="json"):
-    from banking_core.data.postgres_adapter import set_ml_snapshot
-    return set_ml_snapshot(name, payload, bank=bank, metric=metric, kind=kind)
-
-
-def store_global_report(report, top_banks_n=3):
-    """Persist granular snapshots (for the ML pages) + the combined report."""
-    stored = []
-    if report.get("clustering"):
-        stored.append(_set("analysis_clustering", report["clustering"], kind="report"))
-    if report.get("anomaly"):
-        stored.append(_set("analysis_anomaly", report["anomaly"], kind="report"))
-    if report.get("replenishment"):
-        stored.append(_set("analysis_replenishment", report["replenishment"], kind="report"))
-    if report.get("market_share"):
-        stored.append(_set("analysis_marketshare", report["market_share"], kind="report"))
-    if report.get("market_share_records"):
-        stored.append(_set("analysis_marketshare", {
-            "records": report["market_share_records"],
-            "top_banks": report.get("top_banks_records", []),
-        }, kind="report"))
-    if report.get("channel_breakdown"):
-        stored.append(_set("analysis_channel", report["channel_breakdown"], kind="report"))
-    if report.get("channel_records"):
-        stored.append(_set("analysis_channel", {"channels": report["channel_records"]}, kind="report"))
-    if report.get("growth"):
-        stored.append(_set("analysis_growth", report["growth"], kind="report"))
-    if report.get("growth_records"):
-        stored.append(_set("analysis_growth", {"records": report["growth_records"]}, kind="report"))
-    if report.get("correlation"):
-        stored.append(_set("analysis_correlation", report["correlation"], kind="report"))
-    if report.get("monthly_trend_records"):
-        stored.append(_set("analysis_monthly_trend", {"records": report["monthly_trend_records"]}, kind="report"))
-    if report.get("overviews"):
-        stored.append(_set("analysis_overviews", {"banks": report["overviews"]}, kind="report"))
-    if report.get("compare"):
-        stored.append(_set("analysis_compare", {"presets": report["compare"]}, kind="report"))
-    if report.get("whatif"):
-        stored.append(_set("analysis_whatif", report["whatif"], kind="baseline"))
-    for t in report.get("trend", []):
-        stored.append(_set("analysis_trend", t, bank=t.get("bank"), metric=t.get("metric"), kind="decompose"))
-    for m in report.get("migration", []):
-        stored.append(_set("analysis_migration", m, bank=m.get("bank"), kind="predict"))
-    stored.append(_set("analysis_report", report, kind="report"))
-    return sum(1 for s in stored if s)
-
-
-def store_user_report(user_id, report):
-    return _set(f"report_user_{user_id}", report, kind="report")

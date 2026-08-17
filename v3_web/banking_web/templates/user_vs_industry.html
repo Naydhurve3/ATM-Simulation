@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_compute_card.html" import compute_card %}
 {% block title %}You vs Industry — ATM Intelligence{% endblock %}
 {% block content %}
 <div class="page-head reveal in">
@@ -10,11 +11,22 @@
     <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
 </div>
 
+{% if error %}
+<div class="callout callout--warn reveal">
+    <span class="emoji">⚠️</span>
+    <span>{{ error }}</span>
+</div>
+{% endif %}
+
 {% if comparison and comparison.error is defined %}
 <div class="callout callout--warn reveal">
     <span class="emoji">⚠️</span>
     <span>{{ comparison.error }}</span>
 </div>
+{% endif %}
+
+{% if not comparison %}
+{{ compute_card(url_for('routes.user_vs_industry'), "Compare with industry") }}
 {% endif %}
 
 {% if comparison and not comparison.error %}

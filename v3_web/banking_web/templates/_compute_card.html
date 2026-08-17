@@ -1,0 +1,10 @@
+{% macro compute_card(action, label="Compute now", note="Runs on demand when you click — nothing is precomputed or stored.") %}
+<div class="callout callout--warn mt-2 reveal">
+    <span class="emoji">⚡</span>
+    <span>{{ note }}</span>
+    <form method="post" action="{{ action }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn--primary btn--sm" type="submit">{{ label }}</button>
+    </form>
+</div>
+{% endmacro %}

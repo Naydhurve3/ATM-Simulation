@@ -128,13 +128,6 @@ CREATE TABLE IF NOT EXISTS monthly_aggregate (
     "Total_Txn_Vol" DOUBLE PRECISION, "Total_Txn_Val" DOUBLE PRECISION,
     "Digital_Share" DOUBLE PRECISION
 );
-CREATE TABLE IF NOT EXISTS ml_snapshots (
-    snapshot_id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL, bank TEXT, metric TEXT, kind TEXT,
-    payload JSONB NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (name, bank, metric, kind)
-);
 """
 
 
@@ -173,8 +166,6 @@ def init_db():
     cur = conn.cursor()
     try:
         cur.execute("SELECT 1 FROM users LIMIT 1")
-        cur.fetchone()
-        cur.execute("SELECT 1 FROM ml_snapshots LIMIT 1")
         cur.fetchone()
         conn.close()
         return
@@ -410,42 +401,3 @@ def write_dataframe(df, table, if_exists="replace"):
     for row in df[cols].itertuples(index=False, name=None):
         cur.execute(insert_sql, tuple(None if pd.isna(v) and not isinstance(v, str) else v for v in row))
     conn.commit()
-
-
-def set_ml_snapshot(name, payload, bank=None, metric=None, kind="json"):
-    """Upsert a precomputed ML result snapshot (for serverless deployments)."""
-    if not _ENABLED:
-        return False
-    import json
-    conn = get_pg_connection()
-    conn.execute(
-        "INSERT INTO ml_snapshots (name, bank, metric, kind, payload) "
-        "VALUES (%s, %s, %s, %s, %s) "
-        "ON CONFLICT (name, bank, metric, kind) DO UPDATE SET payload = EXCLUDED.payload, "
-        "created_at = CURRENT_TIMESTAMP",
-        (name, bank, metric, kind, json.dumps(payload)),
-    )
-    conn.commit()
-    return True
-
-
-def get_ml_snapshot(name, bank=None, metric=None, kind="json"):
-    if not _ENABLED:
-        return None
-    import json
-    conn = get_pg_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT payload FROM ml_snapshots WHERE name=%s AND "
-        "((%s::text IS NULL AND bank IS NULL) OR bank=%s) AND "
-        "((%s::text IS NULL AND metric IS NULL) OR metric=%s) AND kind=%s "
-        "ORDER BY snapshot_id DESC LIMIT 1",
-        (name, bank, bank, metric, metric, kind),
-    )
-    row = cur.fetchone()
-    if not row:
-        return None
-    try:
-        return json.loads(row[0]) if isinstance(row[0], str) else row[0]
-    except Exception:
-        return row[0]

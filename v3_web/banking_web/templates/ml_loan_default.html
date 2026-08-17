@@ -37,12 +37,12 @@
             <div class="card-title">Risk verdict</div>
             <div class="card-subtitle">For ₹{{ "{:,.0f}".format(loan_amount) }} @ {{ loan_rate }}% / {{ tenure }} months</div>
         </div>
-        {% if default_risk.error is defined %}
+        {% if default_risk and default_risk.error is defined %}
         <div class="callout callout--warn">
             <span class="emoji">⚠️</span>
             <span>{{ default_risk.error }}</span>
         </div>
-        {% else %}
+        {% elif default_risk %}
         <div class="stat-grid">
             <div class="glass-card stat-card {% if default_risk.risk_level == 'LOW' %}stat-card--green{% elif default_risk.risk_level == 'MEDIUM' %}stat-card--gold{% else %}stat-card--red{% endif %}">
                 <span class="stat-icon">📉</span>

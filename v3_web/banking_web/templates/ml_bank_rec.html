@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_compute_card.html" import compute_card %}
 {% block title %}Bank Recommender — ML Lab{% endblock %}
 {% block content %}
 <div class="page-head reveal in">
@@ -10,12 +11,12 @@
     <a class="btn btn--ghost" href="{{ url_for('routes.insights') }}">← Insights hub</a>
 </div>
 
-{% if recommendation.error is defined %}
+{% if recommendation and recommendation.error is defined %}
 <div class="callout callout--warn reveal">
     <span class="emoji">⚠️</span>
     <span>{{ recommendation.error }}</span>
 </div>
-{% else %}
+{% elif recommendation %}
 <div class="glass-card reveal">
     <div class="card-head">
         <div class="card-title">Recommended banks</div>
@@ -45,5 +46,7 @@
         <div class="detail-item"><span class="k">Current bank</span><span class="v">{{ feats.bank }}</span></div>
     </div>
 </div>
+{% else %}
+{{ compute_card(url_for('routes.ml_bank_recommendation'), "Run bank recommendation", "Runs the model on your live profile when you click — nothing is precomputed or stored.") }}
 {% endif %}
 {% endblock %}

@@ -118,45 +118,6 @@ def _run_model(inst, predict_fn, train_fn=None):
     return False, None, error
 
 
-def _snapshot(name, bank=None, metric=None, kind="json"):
-    """Read a precomputed ML/report snapshot from Neon (None when not in PG mode)."""
-    if not _USE_PG:
-        return None
-    try:
-        from banking_core.data.postgres_adapter import get_ml_snapshot
-        return get_ml_snapshot(name, bank=bank, metric=metric, kind=kind)
-    except Exception:
-        return None
-
-
-def _user_report_read():
-    """Read the stored per-user report snapshot only — never computes."""
-    if not _USE_PG:
-        return None
-    return _snapshot(f"report_user_{session['user_id']}", kind="report")
-
-
-def _user_report():
-    """Per-user report; computes + persists on miss (write-through, ML pages)."""
-    if not _USE_PG:
-        return None
-    key = f"report_user_{session['user_id']}"
-    rep = _snapshot(key, kind="report")
-    if rep:
-        return rep
-    try:
-        from banking_core.analytics.report_generator import compute_user_report, store_user_report
-        rep = compute_user_report(session["user_id"])
-        if rep:
-            try:
-                store_user_report(session["user_id"], rep)
-            except Exception:
-                pass
-        return rep
-    except Exception:
-        return None
-
-
 def _train_report(train_name, fn):
     try:
         metrics = fn()
@@ -182,19 +143,15 @@ def _log_activity(activity, amount=0.0, channel="web"):
 
 
 def _churn_snapshot(force=False):
-    """Stored churn snapshot; recompute+store only on miss or explicit refresh."""
-    uid = session["user_id"]
+    """Churn risk from the session-cookie cache; recompute only on explicit refresh."""
+    key = f"churn_{session['user_id']}"
+    if not force:
+        return session.get(key)
     try:
-        from banking_core.analytics.activity_tracker import (
-            build_churn_snapshot, get_churn_snapshot, store_churn_snapshot,
-        )
-        if not force:
-            snap = get_churn_snapshot(uid)
-            if snap:
-                return snap
+        from banking_core.analytics.activity_tracker import build_churn_snapshot
         account = _acct()
-        snap = build_churn_snapshot(_conn(), uid, balance=account.balance)
-        store_churn_snapshot(uid, snap)
+        snap = build_churn_snapshot(_conn(), session["user_id"], balance=account.balance)
+        session[key] = snap
         return snap
     except Exception:
         return None
@@ -229,10 +186,9 @@ def dashboard():
 
     churn = _churn_snapshot()
     activity_count = ((churn or {}).get("features") or {}).get("activity_count", 0)
-    rep = _user_report_read()
     return render_template("dashboard.html", account=account, transactions=transactions,
                            feats=feats, stats=stats, spend=spend, churn=churn,
-                           activity_count=activity_count, has_report=bool(rep))
+                           activity_count=activity_count)
 
 
 @routes_bp.route("/dashboard/churn-refresh", methods=["POST"])
@@ -243,53 +199,43 @@ def churn_refresh():
     return redirect(url_for("routes.dashboard"))
 
 
-# ── Background analysis job (click-triggered, never auto-runs) ──
+# ── Background analysis job (click-triggered, in-memory, never auto-runs) ──
 
-def _job_name(uid):
-    return f"analysis_job_user_{uid}"
+_REPORT_JOBS = {}
 
 
 def _job_state(uid):
-    if not _USE_PG:
-        return {"status": "none", "updated_at": None}
-    return _snapshot(_job_name(uid), kind="job") or {"status": "none", "updated_at": None}
+    return _REPORT_JOBS.get(uid) or {"status": "none", "updated_at": None}
 
 
 def _run_report_bg(uid):
-    """Daemon thread body: compute + store user report, then flip the job flag."""
+    """Daemon thread body: compute personal + industry reports into memory."""
     try:
-        from banking_core.analytics.report_generator import compute_user_report, store_user_report
-        rep = compute_user_report(uid)
-        if rep:
-            store_user_report(uid, rep)
-        set_ml_snapshot(_job_name(uid), {"status": "done", "finished_at": datetime.utcnow().isoformat()[:19]},
-                        kind="job")
+        from banking_core.analytics.report_generator import compute_global_report, compute_user_report
+        personal = compute_user_report(uid)
+        industry = compute_global_report(top_banks_n=3)
+        _REPORT_JOBS[uid] = {
+            "status": "done",
+            "personal": personal,
+            "industry": industry,
+            "finished_at": datetime.utcnow().isoformat()[:19],
+        }
     except Exception:
-        try:
-            set_ml_snapshot(_job_name(uid), {"status": "failed", "finished_at": datetime.utcnow().isoformat()[:19]},
-                            kind="job")
-        except Exception:
-            pass
-
-
-def set_ml_snapshot(name, payload, bank=None, metric=None, kind="json"):
-    from banking_core.data.postgres_adapter import set_ml_snapshot as _set
-    return _set(name, payload, bank=bank, metric=metric, kind=kind)
+        _REPORT_JOBS[uid] = {
+            "status": "failed",
+            "finished_at": datetime.utcnow().isoformat()[:19],
+        }
 
 
 @routes_bp.route("/analysis-report/run", methods=["POST"])
 @login_required
 def analysis_report_run():
     uid = session["user_id"]
-    try:
-        set_ml_snapshot(_job_name(uid), {"status": "running", "started_at": datetime.utcnow().isoformat()[:19]},
-                        kind="job")
-        import threading
-        t = threading.Thread(target=_run_report_bg, args=(uid,), daemon=True)
-        t.start()
-        flash("Analysis started in the background — this page will refresh automatically when it's ready.", "success")
-    except Exception:
-        flash("Could not start analysis — please try again.", "error")
+    _REPORT_JOBS[uid] = {"status": "running", "started_at": datetime.utcnow().isoformat()[:19]}
+    import threading
+    t = threading.Thread(target=_run_report_bg, args=(uid,), daemon=True)
+    t.start()
+    flash("Analysis started in the background — this page will refresh automatically when it's ready.", "success")
     return redirect(url_for("routes.analysis_report"))
 
 
@@ -297,13 +243,20 @@ def analysis_report_run():
 @login_required
 def analysis_report_status():
     state = _job_state(session["user_id"])
-    rep = _user_report_read()
+    status = state.get("status") or "none"
+    if status == "running" and state.get("started_at"):
+        try:
+            started = datetime.strptime(state["started_at"], "%Y-%m-%dT%H:%M:%S")
+            if (datetime.utcnow() - started).total_seconds() > 600:
+                status = "failed"
+        except Exception:
+            pass
     return Response(
         json.dumps({
-            "status": state.get("status") or "none",
+            "status": status,
             "started_at": state.get("started_at"),
             "finished_at": state.get("finished_at"),
-            "has_report": bool(rep),
+            "has_report": status == "done" and bool(state.get("personal")),
         }),
         mimetype="application/json",
     )
@@ -787,15 +740,6 @@ def investment_suggestions():
     suggestions = []
     total_yearly = 0
     error = None
-    if risk == "moderate":
-        rep = _user_report() or {}
-        inv = rep.get("investments")
-        if inv and inv.get("products"):
-            suggestions = [{"category": p.get("name", p.get("category", "Product")), "products": [p],
-                            "total_pct": p.get("allocation_pct", 0)} for p in inv["products"]]
-            total_yearly = inv.get("total_yearly", 0)
-            return render_template("investment.html", suggestions=suggestions, account=account,
-                                   risk=risk, error=error, total_yearly=total_yearly)
     try:
         from banking_core.models.investment_recommender import InvestmentRecommender
         ir = InvestmentRecommender()
@@ -828,19 +772,16 @@ def rfm():
     txns = [dict(zip(cols, r)) for r in c.fetchall()]
     result = None
     error = None
-    rep = _user_report() or {}
-    result = rep.get("rfm")
-    if not result:
-        try:
-            from banking_core.models import RFMSegmenter
-            rfm = RFMSegmenter()
-            if txns:
-                result = rfm.segment(txns)
-                behavior = rfm.get_segment_behavior(result.get("segment")) if result.get("segment") else None
-                if behavior:
-                    result["behavior"] = behavior
-        except Exception as e:
-            error = str(e)
+    try:
+        from banking_core.models import RFMSegmenter
+        rfm = RFMSegmenter()
+        if txns:
+            result = rfm.segment(txns)
+            behavior = rfm.get_segment_behavior(result.get("segment")) if result.get("segment") else None
+            if behavior:
+                result["behavior"] = behavior
+    except Exception as e:
+        error = str(e)
     return render_template("rfm.html", account=account, result=result, error=error, txn_count=len(txns))
 
 
@@ -890,112 +831,63 @@ def _da():
     return DataAnalysis()
 
 
-def _analytics_snap(name):
-    """Stored analytics payload (None when snapshot missing / non-PG mode)."""
-    return _snapshot(name, kind="report")
-
-
-def _analytics_missing(name):
-    """True when the stored snapshot should exist but does not (PG mode)."""
-    return _USE_PG and _analytics_snap(name) is None
-
-
-def _clean_py(o):
-    """JSON-safe deep copy (numpy scalars -> python, NaN/Inf -> None)."""
-    import math
-    if isinstance(o, dict):
-        return {k: _clean_py(v) for k, v in o.items()}
-    if isinstance(o, (list, tuple)):
-        return [_clean_py(v) for v in o]
-    if not isinstance(o, (str, int, float, bool, type(None))) and hasattr(o, "item"):
-        try:
-            return _clean_py(o.item())
-        except Exception:
-            return str(o)
-    if isinstance(o, float) and (math.isnan(o) or math.isinf(o)):
-        return None
-    return o
-
-
-def _store_analytics(name, payload):
-    set_ml_snapshot(name, _clean_py(payload), kind="report")
-
-
-def _refresh_analytics(page):
-    """Recompute one analytics snapshot (click-triggered). Returns error string or None."""
+def _compute_industry_page(page):
+    """Compute one industry analytics payload on demand (click-triggered)."""
     da = _da()
-    try:
-        if page == "market-share":
-            _store_analytics("analysis_marketshare", {
-                "records": da.market_share().to_dict(orient="records"),
-                "top_banks": [{"Bank_Name": k, "Total_Txn_Vol": v}
-                              for k, v in da.top_banks(metric="Total_Txn_Vol", n=10).items()],
-            })
-        elif page == "channel":
-            cb = da.channel_breakdown()
-            _store_analytics("analysis_channel", {
-                "channels": [{"channel": k, "vol": v.get("Vol", 0), "val": v.get("Val", 0)} for k, v in cb.items()],
-            })
-        elif page == "growth":
-            gr = da.growth_rate()
-            _store_analytics("analysis_growth", {
-                "records": [{"Reporting_Month": r["Reporting_Month"], "MoM_Growth_%": r["MoM_Growth_%"]}
-                            for r in gr.to_dict(orient="records")],
-            })
-        elif page == "correlation":
-            df = da.correlation_matrix()
-            labels = [str(c) for c in df.columns]
-            _store_analytics("analysis_correlation", {
-                "labels": labels,
-                "matrix": [[None if str(c) != str(r) else round(float(df.loc[r, c]), 2)
-                            for c in df.columns] for r in df.index],
-            })
-        elif page == "monthly-trend":
-            tr = da.monthly_trend()
-            _store_analytics("analysis_monthly_trend", {
-                "records": [{"Reporting_Month": r["Reporting_Month"], "Total_Txn_Vol": int(r["Total_Txn_Vol"])}
-                            for r in tr.to_dict(orient="records")],
-            })
-        elif page == "overviews":
-            overviews = []
-            for bank in da.get_banks():
-                try:
-                    overviews.append(da.bank_overview(bank))
-                except Exception:
-                    pass
-            _store_analytics("analysis_overviews", {"banks": overviews})
-        elif page == "compare":
-            presets = {
-                "PSU": ["STATE BANK OF INDIA", "BANK OF BARODA", "PUNJAB NATIONAL BANK", "CANARA BANK"],
-                "Private": ["HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD", "KOTAK MAHINDRA BANK LTD"],
-                "Volume": ["STATE BANK OF INDIA", "HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD"],
-            }
-            out = {}
-            for preset_name, preset_banks in presets.items():
-                try:
-                    cmp_df = da.compare_banks(preset_banks)
-                    out[preset_name] = {"banks": preset_banks, "result": cmp_df.to_dict(orient="records")}
-                except Exception:
-                    pass
-            _store_analytics("analysis_compare", {"presets": out})
-        else:
-            return "Unknown page"
-        return None
-    except Exception as e:
-        return str(e)
-
-
-@routes_bp.route("/analytics/refresh", methods=["POST"])
-@login_required
-def analytics_refresh():
-    page = request.form.get("page", "")
-    err = _refresh_analytics(page)
-    if err:
-        flash(f"Could not refresh analytics data: {err}", "error")
-    else:
-        flash("Analytics data refreshed — saved as a snapshot for instant loads", "success")
-    back = request.form.get("back") or url_for("routes.analytics")
-    return redirect(back)
+    if page == "market-share":
+        return {
+            "records": da.market_share().to_dict(orient="records"),
+            "top_banks": [{"Bank_Name": k, "Total_Txn_Vol": v}
+                          for k, v in da.top_banks(metric="Total_Txn_Vol", n=10).items()],
+        }
+    if page == "channel":
+        cb = da.channel_breakdown()
+        return {
+            "channels": [{"channel": k, "vol": v.get("Vol", 0), "val": v.get("Val", 0)} for k, v in cb.items()],
+        }
+    if page == "growth":
+        gr = da.growth_rate()
+        return {
+            "records": [{"Reporting_Month": r["Reporting_Month"], "MoM_Growth_%": r["MoM_Growth_%"]}
+                        for r in gr.to_dict(orient="records")],
+        }
+    if page == "correlation":
+        df = da.correlation_matrix()
+        labels = [str(c) for c in df.columns]
+        return {
+            "labels": labels,
+            "matrix": [[None if str(c) != str(r) else round(float(df.loc[r, c]), 2)
+                        for c in df.columns] for r in df.index],
+        }
+    if page == "monthly-trend":
+        tr = da.monthly_trend()
+        return {
+            "records": [{"Reporting_Month": r["Reporting_Month"], "Total_Txn_Vol": int(r["Total_Txn_Vol"])}
+                        for r in tr.to_dict(orient="records")],
+        }
+    if page == "overviews":
+        overviews = []
+        for bank in da.get_banks():
+            try:
+                overviews.append(da.bank_overview(bank))
+            except Exception:
+                pass
+        return {"banks": overviews}
+    if page == "compare":
+        presets = {
+            "PSU": ["STATE BANK OF INDIA", "BANK OF BARODA", "PUNJAB NATIONAL BANK", "CANARA BANK"],
+            "Private": ["HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD", "KOTAK MAHINDRA BANK LTD"],
+            "Volume": ["STATE BANK OF INDIA", "HDFC BANK LTD", "ICICI BANK LTD", "AXIS BANK LTD"],
+        }
+        out = {}
+        for preset_name, preset_banks in presets.items():
+            try:
+                cmp_df = da.compare_banks(preset_banks)
+                out[preset_name] = {"banks": preset_banks, "result": cmp_df.to_dict(orient="records")}
+            except Exception:
+                pass
+        return {"presets": out}
+    raise ValueError(f"Unknown page: {page}")
 
 
 @routes_bp.route("/analytics")
@@ -1017,127 +909,95 @@ def analytics():
                            income=income, breakdown=breakdown)
 
 
-@routes_bp.route("/analytics/monthly-trend")
+@routes_bp.route("/analytics/monthly-trend", methods=["GET", "POST"])
 @login_required
 def monthly_trend():
     industry = None
-    snap = _analytics_snap("analysis_monthly_trend")
-    if snap:
-        industry = snap.get("records")
-    elif not _USE_PG:
+    error = None
+    if request.method == "POST":
         try:
-            df = _da().monthly_trend()
-            if df is not None and hasattr(df, "columns"):
-                industry = df.to_dict(orient="records")
-        except Exception:
-            industry = None
+            industry = _compute_industry_page("monthly-trend").get("records")
+        except Exception as e:
+            error = str(e)
     c = _c()
     date_sql = "TO_CHAR(timestamp, 'YYYY-MM')" if _USE_PG else "strftime('%Y-%m', timestamp)"
     c.execute(f"""SELECT {date_sql} as month, type, SUM(amount) as total, COUNT(*) as cnt
                  FROM transactions WHERE user_id=? GROUP BY month, type ORDER BY month""", (session["user_id"],))
     cols = [d[0] for d in c.description]
     user_trends = [dict(zip(cols, r)) for r in c.fetchall()]
-    return render_template("monthly_trend.html", industry=industry, user_trends=user_trends,
-                           missing=_analytics_missing("analysis_monthly_trend"))
+    return render_template("monthly_trend.html", industry=industry, user_trends=user_trends, error=error)
 
 
-@routes_bp.route("/analytics/channel-breakdown")
+@routes_bp.route("/analytics/channel-breakdown", methods=["GET", "POST"])
 @login_required
 def channel_breakdown():
     channels = None
-    snap = _analytics_snap("analysis_channel")
-    if snap:
-        channels = snap.get("channels")
-    elif not _USE_PG:
+    error = None
+    if request.method == "POST":
         try:
-            raw = _da().channel_breakdown()
-            channels = [{"channel": k, "vol": v.get("Vol", 0), "val": v.get("Val", 0)} for k, v in raw.items()]
-        except Exception:
-            channels = None
+            channels = _compute_industry_page("channel").get("channels")
+        except Exception as e:
+            error = str(e)
     c = _c()
     c.execute("SELECT channel, COUNT(*) as cnt, COALESCE(SUM(amount),0) as tot FROM transactions WHERE user_id=? GROUP BY channel",
               (session["user_id"],))
     cols = [d[0] for d in c.description]
     user_channels = [dict(zip(cols, r)) for r in c.fetchall()]
-    return render_template("channel_breakdown.html", channels=channels, user_channels=user_channels,
-                           missing=_analytics_missing("analysis_channel"))
+    return render_template("channel_breakdown.html", channels=channels, user_channels=user_channels, error=error)
 
 
-@routes_bp.route("/analytics/market-share")
+@routes_bp.route("/analytics/market-share", methods=["GET", "POST"])
 @login_required
 def market_share():
     ms = None
     tb = None
-    snap = _analytics_snap("analysis_marketshare")
-    if snap:
-        ms = snap.get("records")
-        tb = snap.get("top_banks")
-    elif not _USE_PG:
+    error = None
+    if request.method == "POST":
         try:
-            da = _da()
-            ms_df = da.market_share()
-            tb_series = da.top_banks()
-            if ms_df is not None and hasattr(ms_df, "columns"):
-                ms = ms_df.to_dict(orient="records")
-            if tb_series is not None and hasattr(tb_series, "items"):
-                tb = [{"Bank_Name": k, "Total_Txn_Vol": v} for k, v in tb_series.items()]
-        except Exception:
-            pass
-    return render_template("market_share.html", market_share=ms, top_banks=tb,
-                           missing=_analytics_missing("analysis_marketshare"))
+            snap = _compute_industry_page("market-share")
+            ms = snap.get("records")
+            tb = snap.get("top_banks")
+        except Exception as e:
+            error = str(e)
+    return render_template("market_share.html", market_share=ms, top_banks=tb, error=error)
 
 
-@routes_bp.route("/analytics/growth-rate")
+@routes_bp.route("/analytics/growth-rate", methods=["GET", "POST"])
 @login_required
 def growth_rate():
     gr = None
-    snap = _analytics_snap("analysis_growth")
-    if snap:
-        gr = snap.get("records")
-    elif not _USE_PG:
+    error = None
+    if request.method == "POST":
         try:
-            da = _da()
-            result = da.growth_rate()
-            if result is not None and hasattr(result, "columns"):
-                gr = result.to_dict(orient="records")
-        except Exception:
-            pass
-    return render_template("growth_rate.html", growth_rate=gr,
-                           missing=_analytics_missing("analysis_growth"))
+            gr = _compute_industry_page("growth").get("records")
+        except Exception as e:
+            error = str(e)
+    return render_template("growth_rate.html", growth_rate=gr, error=error)
 
 
-@routes_bp.route("/analytics/user-vs-industry")
+@routes_bp.route("/analytics/user-vs-industry", methods=["GET", "POST"])
 @login_required
 def user_vs_industry():
     account = _acct()
     comparison = None
-    rep = _user_report() or {}
-    comparison = rep.get("user_vs_industry")
-    if not comparison:
+    error = None
+    if request.method == "POST":
         try:
             user_data = {"bank": account.bank, "balance": account.balance, "age_group": account.age_group}
             comparison = _da().user_vs_industry(user_data)
-        except Exception:
-            pass
-    return render_template("user_vs_industry.html", account=account, comparison=comparison)
+        except Exception as e:
+            error = str(e)
+    return render_template("user_vs_industry.html", account=account, comparison=comparison, error=error)
 
 
-@routes_bp.route("/analytics/bank-overview")
+@routes_bp.route("/analytics/bank-overview", methods=["GET", "POST"])
 @login_required
 def bank_overview():
-    bank_name = request.args.get("bank", "").strip() or "STATE BANK OF INDIA"
+    bank_name = request.form.get("bank", "").strip() if request.method == "POST" else request.args.get("bank", "").strip()
+    bank_name = bank_name or "STATE BANK OF INDIA"
     overview = None
     error = None
-    snap = _analytics_snap("analysis_overviews")
-    banks = snap.get("banks") if snap else None
-    if banks:
-        match = [b for b in banks if b.get("Bank") == bank_name]
-        if not match:
-            first = banks[0] if banks else {}
-            bank_name = first.get("Bank", bank_name)
-            match = [b for b in banks if b.get("Bank") == bank_name]
-        overview = match[0] if match else None
-    elif not _USE_PG:
+    if request.method == "POST":
         try:
             da = _da()
             available = da.get_banks()
@@ -1146,11 +1006,10 @@ def bank_overview():
             overview = da.bank_overview(bank_name)
         except Exception as e:
             error = str(e)
-    return render_template("bank_overview.html", bank_name=bank_name, overview=overview,
-                           error=error, missing=_analytics_missing("analysis_overviews"))
+    return render_template("bank_overview.html", bank_name=bank_name, overview=overview, error=error)
 
 
-@routes_bp.route("/analytics/compare")
+@routes_bp.route("/analytics/compare", methods=["GET", "POST"])
 @login_required
 def bank_compare():
     presets = {
@@ -1160,25 +1019,17 @@ def bank_compare():
     }
     selected = []
     try:
-        preset = request.args.get("preset", "")
+        preset = request.form.get("preset", "") if request.method == "POST" else request.args.get("preset", "")
         if preset in presets:
             selected = presets[preset]
         else:
-            raw = request.args.get("banks", "").split(",")
-            selected = [b.strip() for b in raw if b.strip()][:6]
+            raw = request.form.get("banks", "") if request.method == "POST" else request.args.get("banks", "")
+            selected = [b.strip() for b in raw.split(",") if b.strip()][:6]
     except Exception:
         selected = []
     result = None
     error = None
-    snap = _analytics_snap("analysis_compare")
-    presets_map = (snap or {}).get("presets") or {}
-    if snap and preset in presets_map:
-        entry = presets_map[preset]
-        result = entry.get("result")
-        selected = entry.get("banks") or selected
-    elif preset in presets and not snap:
-        pass
-    else:
+    if request.method == "POST":
         try:
             da = _da()
             available = da.get_banks()
@@ -1187,34 +1038,31 @@ def bank_compare():
                 result = da.compare_banks(selected)
                 if hasattr(result, "to_dict"):
                     result = result.to_dict(orient="records")
+            else:
+                error = "No valid banks selected"
         except Exception as e:
             error = str(e)
     return render_template("bank_compare.html", result=result, selected=selected,
-                           presets=presets, error=error, missing=_analytics_missing("analysis_compare"))
+                           presets=presets, error=error)
 
 
-@routes_bp.route("/analytics/correlation")
+@routes_bp.route("/analytics/correlation", methods=["GET", "POST"])
 @login_required
 def correlation():
     matrix = None
     labels = None
     error = None
-    snap = _analytics_snap("analysis_correlation")
-    if snap:
-        matrix = snap.get("matrix")
-        labels = snap.get("labels")
-    elif not _USE_PG:
+    if request.method == "POST":
         try:
-            df = _da().correlation_matrix()
-            labels = [str(c) for c in df.columns]
-            matrix = [[None if str(c) != str(r) else round(float(df.loc[r, c]), 2) for c in df.columns] for r in df.index]
+            snap = _compute_industry_page("correlation")
+            matrix = snap.get("matrix")
+            labels = snap.get("labels")
         except Exception as e:
             error = str(e)
-    return render_template("correlation.html", matrix=matrix, labels=labels, error=error,
-                           missing=_analytics_missing("analysis_correlation"))
+    return render_template("correlation.html", matrix=matrix, labels=labels, error=error)
 
 
-@routes_bp.route("/analytics/personal")
+@routes_bp.route("/analytics/personal", methods=["GET", "POST"])
 @login_required
 def personal_analytics():
     account = _acct()
@@ -1232,9 +1080,7 @@ def personal_analytics():
 
     forecast = None
     error = None
-    rep = _user_report() or {}
-    forecast = rep.get("forecast")
-    if not forecast:
+    if request.method == "POST":
         try:
             from banking_core.models import SpendingForecaster
             sf = SpendingForecaster()
@@ -1254,10 +1100,11 @@ def personal_analytics():
 @routes_bp.route("/analysis-report")
 @login_required
 def analysis_report():
-    """Click-triggered report: reads stored snapshots only; runs only via /analysis-report/run."""
+    """Click-triggered report: renders in-memory job results only; runs via /analysis-report/run."""
     account = _acct()
-    rep = _user_report_read()
-    industry = _snapshot("analysis_report", kind="report") or {}
+    state = _job_state(session["user_id"])
+    rep = state.get("personal") if state.get("status") == "done" else None
+    industry = state.get("industry") if state.get("status") == "done" else None
     if request.args.get("format") == "json":
         payload = {"personal": rep, "industry": industry}
         return Response(
@@ -1266,7 +1113,7 @@ def analysis_report():
             headers={"Content-Disposition": 'attachment; filename="analysis_report.json"'},
         )
     return render_template("analysis_report.html", account=account, rep=rep, industry=industry,
-                           job=_job_state(session["user_id"]))
+                           job=state)
 
 
 # ── ML Insights Hub ──────────────────────────────────────────
@@ -1281,15 +1128,13 @@ def insights():
     return render_template("insights.html", account=account, feats=feats)
 
 
-@routes_bp.route("/ml/credit-prediction")
+@routes_bp.route("/ml/credit-prediction", methods=["GET", "POST"])
 @login_required
 def ml_credit_prediction():
     account = _acct()
     feats = _feature_context()
-    prediction = {}
-    rep = _user_report() or {}
-    prediction = rep.get("credit_ml")
-    if not prediction:
+    prediction = None
+    if request.method == "POST":
         try:
             from banking_core.models import CreditScorer
             cs = CreditScorer()
@@ -1302,15 +1147,13 @@ def ml_credit_prediction():
     return render_template("ml_credit.html", account=account, prediction=prediction, feats=feats)
 
 
-@routes_bp.route("/ml/churn-analysis")
+@routes_bp.route("/ml/churn-analysis", methods=["GET", "POST"])
 @login_required
 def ml_churn_analysis():
     account = _acct()
     feats = _feature_context()
     churn = None
-    rep = _user_report() or {}
-    churn = rep.get("churn")
-    if not churn:
+    if request.method == "POST":
         try:
             from banking_core.models import ChurnPredictor
             cp = ChurnPredictor()
@@ -1334,43 +1177,31 @@ def ml_loan_default():
     loan_amount = float(request.form.get("amount", 200000)) if request.method == "POST" else 200000
     loan_rate = float(request.form.get("rate", 10.0)) if request.method == "POST" else 10.0
     tenure = int(request.form.get("tenure", 24)) if request.method == "POST" else 24
-    if _USE_PG and request.method == "GET":
-        rep = _user_report() or {}
-        loan = rep.get("loan")
-        if loan and loan.get("result"):
-            default_risk = loan["result"]
-            amortization = None
-            return render_template("ml_loan_default.html", account=account, default_risk=default_risk,
-                                   feats=feats, amortization=amortization, loan_amount=loan_amount,
-                                   loan_rate=loan_rate, tenure=tenure)
-    try:
-        from banking_core.models import LoanDefaultModel
-        lm = LoanDefaultModel()
-        ok, res, err = _run_model(lm, lambda: lm.predict({
-            "credit_score": feats["credit_score"], "balance": feats["balance"],
-            "age": feats["age"], "income_bracket": feats["income_bracket"]},
-            loan_amount, loan_rate, tenure), lm.train)
-        default_risk = res if ok else {"error": err}
-        if ok:
-            amortization = lm.generate_amortization_schedule(loan_amount, loan_rate, tenure)
-    except Exception as e:
-        default_risk = {"error": str(e)}
+    if request.method == "POST":
+        try:
+            from banking_core.models import LoanDefaultModel
+            lm = LoanDefaultModel()
+            ok, res, err = _run_model(lm, lambda: lm.predict({
+                "credit_score": feats["credit_score"], "balance": feats["balance"],
+                "age": feats["age"], "income_bracket": feats["income_bracket"]},
+                loan_amount, loan_rate, tenure), lm.train)
+            default_risk = res if ok else {"error": err}
+            if ok:
+                amortization = lm.generate_amortization_schedule(loan_amount, loan_rate, tenure)
+        except Exception as e:
+            default_risk = {"error": str(e)}
     return render_template("ml_loan_default.html", account=account, default_risk=default_risk,
                            feats=feats, amortization=amortization, loan_amount=loan_amount,
                            loan_rate=loan_rate, tenure=tenure)
 
 
-@routes_bp.route("/ml/bank-recommendation")
+@routes_bp.route("/ml/bank-recommendation", methods=["GET", "POST"])
 @login_required
 def ml_bank_recommendation():
     account = _acct()
     feats = _feature_context()
-    recommendation = {}
-    rep = _user_report() or {}
-    bankrec = rep.get("bankrec")
-    if bankrec and bankrec.get("banks"):
-        recommendation = {"banks": bankrec["banks"]}
-    else:
+    recommendation = None
+    if request.method == "POST":
         try:
             from banking_core.models import BankRecommender
             br = BankRecommender()
@@ -1403,33 +1234,20 @@ def cash_demand():
     prediction = None
     backtest = None
     error = None
-    precomputed = False
-    if _USE_PG:
+    if request.method == "POST":
         try:
-            from banking_core.data.postgres_adapter import get_ml_snapshot
-            snap = get_ml_snapshot("cash_demand", bank=bank, metric=metric, kind="forecast")
-            if snap:
-                prediction = snap
-                precomputed = True
-            else:
-                error = f"No precomputed forecast for {bank} · {metric} on the deployed instance."
+            from banking_core.models import CashDemandForecaster
+            fc = CashDemandForecaster()
+            ok, res, err = _run_model(fc, lambda: fc.predict(bank, metric),
+                                      lambda: fc.train(bank, metric))
+            prediction = res if ok else None
+            error = err if not ok else None
+            if ok:
+                bt = fc.backtest(bank, metric)
+                if isinstance(bt, dict) and "error" not in bt:
+                    backtest = bt
         except Exception as e:
             error = str(e)
-        return render_template("ml_cash_demand.html", banks=banks, bank=bank, metric=metric,
-                               prediction=prediction, backtest=None, error=error, precomputed=precomputed)
-    try:
-        from banking_core.models import CashDemandForecaster
-        fc = CashDemandForecaster()
-        ok, res, err = _run_model(fc, lambda: fc.predict(bank, metric),
-                                  lambda: fc.train(bank, metric))
-        prediction = res if ok else None
-        error = err if not ok else None
-        if ok:
-            bt = fc.backtest(bank, metric)
-            if isinstance(bt, dict) and "error" not in bt:
-                backtest = bt
-    except Exception as e:
-        error = str(e)
     return render_template("ml_cash_demand.html", banks=banks, bank=bank, metric=metric,
                            prediction=prediction, backtest=backtest, error=error)
 
@@ -1441,42 +1259,28 @@ def txn_volume():
     features = None
     importance = None
     error = None
-    precomputed = False
-    if _USE_PG:
+    if request.method == "POST":
         try:
-            from banking_core.data.postgres_adapter import get_ml_snapshot
-            snap = get_ml_snapshot("txn_volume", bank=None, metric=target, kind="predict")
-            if snap:
-                features = snap.get("features")
-                importance = snap.get("importance")
-                precomputed = True
-            else:
-                error = f"No precomputed prediction for target {target}."
+            import pandas as pd
+            from banking_core.models import TransactionPredictor
+            tp = TransactionPredictor()
+            demo = {"Total_Txn_Vol": 5_000_000, "Total_Cards": 3_000_000, "Digital_Share": 45,
+                    "Cash_Share": 55, "Total_ATMs": 1200, "PoS": 50000}
+
+            def _predict():
+                row = {c: 0.0 for c in tp.feature_cols}
+                for k, v in demo.items():
+                    if k in row:
+                        row[k] = v
+                return tp.predict(pd.DataFrame([row]))
+
+            ok, res, err = _run_model(tp, _predict, lambda: tp.train(target))
+            features = res if ok else None
+            error = err if not ok else None
+            if ok:
+                importance = tp.get_feature_importance()
         except Exception as e:
             error = str(e)
-        return render_template("ml_txn_volume.html", features=features, importance=importance,
-                               error=error, target=target, precomputed=precomputed)
-    try:
-        import pandas as pd
-        from banking_core.models import TransactionPredictor
-        tp = TransactionPredictor()
-        demo = {"Total_Txn_Vol": 5_000_000, "Total_Cards": 3_000_000, "Digital_Share": 45,
-                "Cash_Share": 55, "Total_ATMs": 1200, "PoS": 50000}
-
-        def _predict():
-            row = {c: 0.0 for c in tp.feature_cols}
-            for k, v in demo.items():
-                if k in row:
-                    row[k] = v
-            return tp.predict(pd.DataFrame([row]))
-
-        ok, res, err = _run_model(tp, _predict, lambda: tp.train(target))
-        features = res if ok else None
-        error = err if not ok else None
-        if ok:
-            importance = tp.get_feature_importance()
-    except Exception as e:
-        error = str(e)
     return render_template("ml_txn_volume.html", features=features, importance=importance,
                            error=error, target=target)
 
@@ -1488,27 +1292,20 @@ def bank_clustering():
     profiles = None
     optimal = None
     error = None
-    if _USE_PG and k == 4:
-        snap = _snapshot("analysis_clustering", kind="report")
-        if snap:
-            profiles = snap.get("profiles")
-            optimal = snap.get("optimal_k")
-            error = snap.get("error")
-            return render_template("ml_clustering.html", profiles=profiles, optimal=optimal,
-                                   error=error, k=k)
-    try:
-        from banking_core.models import BankClustering
-        bc = BankClustering()
+    if request.method == "POST":
         try:
-            optimal = bc.get_optimal_k(10)
-        except Exception:
-            optimal = None
-        ok, res, err = _run_model(bc, lambda: bc.get_cluster_profiles(),
-                                  lambda: bc.train(k=k))
-        profiles = res if ok else None
-        error = err if not ok else None
-    except Exception as e:
-        error = str(e)
+            from banking_core.models import BankClustering
+            bc = BankClustering()
+            try:
+                optimal = bc.get_optimal_k(10)
+            except Exception:
+                optimal = None
+            ok, res, err = _run_model(bc, lambda: bc.get_cluster_profiles(),
+                                      lambda: bc.train(k=k))
+            profiles = res if ok else None
+            error = err if not ok else None
+        except Exception as e:
+            error = str(e)
     return render_template("ml_clustering.html", profiles=profiles, optimal=optimal,
                            error=error, k=k)
 
@@ -1520,25 +1317,18 @@ def anomaly_detection():
     flagged = None
     monthly = None
     error = None
-    if _USE_PG and contamination == 0.05:
-        snap = _snapshot("analysis_anomaly", kind="report")
-        if snap:
-            flagged = snap.get("flagged")
-            monthly = snap.get("monthly")
-            error = snap.get("error")
-            return render_template("ml_anomaly.html", flagged=flagged, monthly=monthly,
-                                   error=error, contamination=contamination)
-    try:
-        from banking_core.models import AnomalyDetector
-        ad = AnomalyDetector()
-        ok, res, err = _run_model(ad, lambda: ad.get_flagged_banks(15),
-                                  lambda: ad.train(contamination=contamination))
-        flagged = res if ok else None
-        error = err if not ok else None
-        if ok:
-            monthly = ad.get_monthly_anomalies()
-    except Exception as e:
-        error = str(e)
+    if request.method == "POST":
+        try:
+            from banking_core.models import AnomalyDetector
+            ad = AnomalyDetector()
+            ok, res, err = _run_model(ad, lambda: ad.get_flagged_banks(15),
+                                      lambda: ad.train(contamination=contamination))
+            flagged = res if ok else None
+            error = err if not ok else None
+            if ok:
+                monthly = ad.get_monthly_anomalies()
+        except Exception as e:
+            error = str(e)
     return render_template("ml_anomaly.html", flagged=flagged, monthly=monthly,
                            error=error, contamination=contamination)
 
@@ -1553,51 +1343,24 @@ def trend_decomposition():
         bank = banks[0] if banks else bank
     components = None
     error = None
-    if _USE_PG:
-        snap = _snapshot("analysis_trend", bank=bank, metric=metric, kind="decompose")
-        if snap and snap.get("components"):
-            return render_template("ml_decomposition.html", banks=banks, bank=bank, metric=metric,
-                                   components=snap["components"], error=None)
+    if request.method == "POST":
         try:
             import pandas as pd
-            from banking_core.data.postgres_adapter import get_industry_conn
-            conn = get_industry_conn()
-            df = pd.read_sql("SELECT * FROM atm_card_stats", conn)
-            conn.close()
-            data = df[df["Bank_Name"] == bank][["Reporting_Month", "Month_Num", metric]].sort_values("Month_Num")
-            observed = data[metric].astype(float).tolist()
-            months = data["Reporting_Month"].tolist()
-            trend = data[metric].astype(float).rolling(3, min_periods=1).mean().tolist()
-            components = {
-                "months": [str(m) for m in months],
-                "observed": [round(float(x), 2) if x is not None else None for x in observed],
-                "trend": [None if pd.isna(x) else round(float(x), 2) for x in trend],
-                "seasonal": [None] * len(months),
-                "resid": [round(float(a) - (float(t) if not pd.isna(t) else 0), 2)
-                          for a, t in zip(observed, trend)],
-            }
-            return render_template("ml_decomposition.html", banks=banks, bank=bank, metric=metric,
-                                   components=components, error=None)
+            from banking_core.models import TrendAnalyzer
+            ta = TrendAnalyzer()
+            ok, res, err = _run_model(ta, lambda: ta.decompose(bank, metric))
+            error = err if not ok else None
+            if ok:
+                comps = res
+                components = {
+                    "months": [d.strftime("%b") for d in comps.trend.index],
+                    "observed": [None if pd.isna(x) else round(float(x), 2) for x in comps.observed],
+                    "trend": [None if pd.isna(x) else round(float(x), 2) for x in comps.trend],
+                    "seasonal": [None if pd.isna(x) else round(float(x), 2) for x in comps.seasonal],
+                    "resid": [None if pd.isna(x) else round(float(x), 2) for x in comps.resid],
+                }
         except Exception as e:
-            error = f"Precomputed decomposition unavailable: {e}"
-            return render_template("ml_decomposition.html", banks=banks, bank=bank, metric=metric,
-                                   components=None, error=error)
-    try:
-        from banking_core.models import TrendAnalyzer
-        ta = TrendAnalyzer()
-        ok, res, err = _run_model(ta, lambda: ta.decompose(bank, metric))
-        error = err if not ok else None
-        if ok:
-            comps = res
-            components = {
-                "months": [d.strftime("%b") for d in comps.trend.index],
-                "observed": [None if pd.isna(x) else round(float(x), 2) for x in comps.observed],
-                "trend": [None if pd.isna(x) else round(float(x), 2) for x in comps.trend],
-                "seasonal": [None if pd.isna(x) else round(float(x), 2) for x in comps.seasonal],
-                "resid": [None if pd.isna(x) else round(float(x), 2) for x in comps.resid],
-            }
-    except Exception as e:
-        error = str(e)
+            error = str(e)
     return render_template("ml_decomposition.html", banks=banks, bank=bank, metric=metric,
                            components=components, error=error)
 
@@ -1612,21 +1375,16 @@ def channel_migration():
         bank = banks[0] if banks else bank
     prediction = None
     error = None
-    if _USE_PG and months == 6:
-        snap = _snapshot("analysis_migration", bank=bank, kind="predict")
-        if snap and snap.get("prediction"):
-            prediction = snap["prediction"]
-            return render_template("ml_migration.html", banks=banks, bank=bank, months=months,
-                                   prediction=prediction, error=None)
-    try:
-        from banking_core.models import ChannelMigrationPredictor
-        cm = ChannelMigrationPredictor()
-        ok, res, err = _run_model(cm, lambda: cm.predict(bank, months),
-                                  lambda: cm.train(bank))
-        prediction = res if ok else None
-        error = err if not ok else None
-    except Exception as e:
-        error = str(e)
+    if request.method == "POST":
+        try:
+            from banking_core.models import ChannelMigrationPredictor
+            cm = ChannelMigrationPredictor()
+            ok, res, err = _run_model(cm, lambda: cm.predict(bank, months),
+                                      lambda: cm.train(bank))
+            prediction = res if ok else None
+            error = err if not ok else None
+        except Exception as e:
+            error = str(e)
     return render_template("ml_migration.html", banks=banks, bank=bank, months=months,
                            prediction=prediction, error=error)
 
@@ -1638,16 +1396,10 @@ def what_if():
     result = None
     error = None
     submitted = request.method == "POST"
-    if _USE_PG and request.method == "GET":
-        snap = _snapshot("analysis_whatif", kind="baseline")
-        if snap:
-            result = snap
-            return render_template("ml_whatif.html", result=result, error=error, changes=changes,
-                                   submitted=False)
-    try:
-        from banking_core.models import WhatIfSimulator
-        ws = WhatIfSimulator()
-        if submitted:
+    if submitted:
+        try:
+            from banking_core.models import WhatIfSimulator
+            ws = WhatIfSimulator()
             for key in ("Total_ATMs", "PoS", "Digital_Share", "Total_Cards"):
                 raw = request.form.get(key, "").strip()
                 if raw:
@@ -1659,8 +1411,8 @@ def what_if():
                 ok, res, err = _run_model(ws, lambda: ws.simulate(changes), lambda: ws.train())
                 result = res if ok else None
                 error = err if not ok else None
-    except Exception as e:
-        error = str(e)
+        except Exception as e:
+            error = str(e)
     return render_template("ml_whatif.html", result=result, error=error, changes=changes, submitted=submitted)
 
 
@@ -1700,35 +1452,21 @@ def lstm_vs_prophet():
     prophet_result = None
     lstm_result = None
     error = None
-    precomputed = False
-    if _USE_PG:
+    if request.method == "POST":
         try:
-            from banking_core.data.postgres_adapter import get_ml_snapshot
-            snap_p = get_ml_snapshot("cash_demand", bank=bank, metric=metric, kind="forecast")
-            snap_l = get_ml_snapshot("lstm", bank=bank, metric=metric, kind="forecast")
-            prophet_result = snap_p
-            lstm_result = snap_l
-            precomputed = bool(snap_p or snap_l)
-            if not snap_p and not snap_l:
-                error = f"No precomputed forecasts for {bank} · {metric} on the deployed instance."
+            from banking_core.models import CashDemandForecaster, LSTMForecaster
+            fc = CashDemandForecaster()
+            ok_p, res_p, err_p = _run_model(fc, lambda: fc.predict(bank, metric),
+                                            lambda: fc.train(bank, metric))
+            prophet_result = res_p if ok_p else None
+            lstm = LSTMForecaster()
+            ok_l, res_l, err_l = _run_model(lstm, lambda: lstm.predict(bank, metric),
+                                            lambda: lstm.train(bank, metric))
+            lstm_result = res_l if ok_l else None
+            errors = [e for e in (err_p if not ok_p else None, err_l if not ok_l else None) if e]
+            error = "; ".join(errors) if errors else None
         except Exception as e:
             error = str(e)
-        return render_template("ml_lstm_vs_prophet.html", banks=banks, bank=bank, metric=metric,
-                               prophet=prophet_result, lstm=lstm_result, error=error, precomputed=precomputed)
-    try:
-        from banking_core.models import CashDemandForecaster, LSTMForecaster
-        fc = CashDemandForecaster()
-        ok_p, res_p, err_p = _run_model(fc, lambda: fc.predict(bank, metric),
-                                        lambda: fc.train(bank, metric))
-        prophet_result = res_p if ok_p else None
-        lstm = LSTMForecaster()
-        ok_l, res_l, err_l = _run_model(lstm, lambda: lstm.predict(bank, metric),
-                                        lambda: lstm.train(bank, metric))
-        lstm_result = res_l if ok_l else None
-        errors = [e for e in (err_p if not ok_p else None, err_l if not ok_l else None) if e]
-        error = "; ".join(errors) if errors else None
-    except Exception as e:
-        error = str(e)
     return render_template("ml_lstm_vs_prophet.html", banks=banks, bank=bank, metric=metric,
                            prophet=prophet_result, lstm=lstm_result, error=error)
 
@@ -1737,10 +1475,7 @@ def lstm_vs_prophet():
 @login_required
 def retrain_all():
     results = None
-    if _USE_PG:
-        results = [("Heavy models (Prophet / LSTM / XGBoost)", "Skipped",
-                    "Precomputed snapshots are generated offline and stored in Neon")]
-    elif request.method == "POST":
+    if request.method == "POST":
         from banking_core.models import (
             CashDemandForecaster, TransactionPredictor, BankClustering, AnomalyDetector,
             ChannelMigrationPredictor, WhatIfSimulator, CreditScorer, ChurnPredictor,
@@ -1790,9 +1525,7 @@ def monitoring():
         }
         spec = mapping.get(model_name)
         try:
-            if _USE_PG:
-                train_outcome = (model_name, "Skipped — precomputed on Neon")
-            elif spec:
+            if spec:
                 mod = importlib.import_module(spec[0])
                 cls = getattr(mod, spec[1])
                 inst = cls()

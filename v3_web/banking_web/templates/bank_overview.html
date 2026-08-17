@@ -5,12 +5,13 @@
     <div>
         <span class="page-eyebrow">Analytics</span>
         <h1>Bank Overview</h1>
-        <p class="page-desc">Deep dive into any bank's ATM footprint.</p>
+        <p class="page-desc">Deep dive into any bank's ATM footprint — computed on demand.</p>
     </div>
     <a class="btn btn--ghost" href="{{ url_for('routes.analytics') }}">← Analytics hub</a>
 </div>
 
-<form class="glass-card reveal" method="get" action="{{ url_for('routes.bank_overview') }}">
+<form class="glass-card reveal" method="post" action="{{ url_for('routes.bank_overview') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="flex flex-wrap">
         <input class="form-control" type="text" name="bank" value="{{ bank_name }}" placeholder="Bank name">
         <button class="btn btn--primary" type="submit">Analyse</button>
@@ -21,19 +22,6 @@
 <div class="callout callout--warn mt-2 reveal">
     <span class="emoji">⚠️</span>
     <span>{{ error }}</span>
-</div>
-{% endif %}
-
-{% if missing %}
-<div class="callout callout--warn mt-2 reveal">
-    <span class="emoji">🔄</span>
-    <span>Bank snapshots are not computed yet. Click <strong>Refresh data</strong> to precompute all 65 banks once — they are saved and served instantly afterwards.</span>
-    <form method="post" action="{{ url_for('routes.analytics_refresh') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="page" value="overviews">
-        <input type="hidden" name="back" value="{{ request.full_path }}">
-        <button class="btn btn--primary btn--sm" type="submit">↻ Refresh data</button>
-    </form>
 </div>
 {% endif %}
 

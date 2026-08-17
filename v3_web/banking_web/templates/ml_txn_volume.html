@@ -33,9 +33,6 @@
             <div class="card-title">Prediction</div>
             <div class="card-subtitle">For a typical metro network profile</div>
         </div>
-        {% if precomputed %}
-        <span class="pill pill--accent mb-1">⚡ Precomputed snapshot</span>
-        {% endif %}
         {% if features %}
         <div class="stat-grid">
             {% for k, v in features.items() if v is not mapping and v is not sequence %}

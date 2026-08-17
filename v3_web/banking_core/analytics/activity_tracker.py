@@ -1,19 +1,14 @@
-"""Lightweight user-activity tracking + snapshot-based churn risk (serverless-friendly).
+"""Lightweight user-activity tracking + rule-based churn risk.
 
 Design: every meaningful user action is appended to the `user_activity` table with a
-single cheap INSERT. Prediction views read a STORED snapshot; the snapshot is only
-recomputed on demand (refresh button) or right after a banking action — never during
-a page view. No model code (sklearn/joblib) is loaded here at all.
+single cheap INSERT. Churn risk is computed on demand (refresh button / banking
+action) — never during a page view. No model code (sklearn/joblib) is loaded here
+at all, and no results are persisted anywhere.
 """
 
 from datetime import date, datetime
 
-from banking_core.data.postgres_adapter import (
-    get_ecosystem_conn,
-    get_ml_snapshot,
-    is_enabled,
-    set_ml_snapshot,
-)
+from banking_core.data.postgres_adapter import get_ecosystem_conn, is_enabled
 
 _ACTIVITY_DDL = """
 CREATE TABLE IF NOT EXISTS user_activity (
@@ -27,8 +22,6 @@ CREATE TABLE IF NOT EXISTS user_activity (
 """
 
 _TRACKED_ACTIVITIES = ("deposit", "withdraw", "transfer")
-
-_SNAPSHOT_KIND = "report"
 
 
 def ensure_activity_table(conn):
@@ -118,7 +111,7 @@ def churn_risk(feats):
 
 
 def build_churn_snapshot(conn, user_id, balance=0.0):
-    """Compute the full churn snapshot dict from stored activity."""
+    """Compute the churn risk dict from stored activity (pure function)."""
     feats = activity_features(conn, user_id)
     score, level = churn_risk(feats)
     return {
@@ -129,22 +122,3 @@ def build_churn_snapshot(conn, user_id, balance=0.0):
         "balance": round(balance or 0, 2),
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-
-
-def get_churn_snapshot(user_id):
-    """Read the stored snapshot (PG only; sqlite mode always recomputes)."""
-    if is_enabled():
-        try:
-            return get_ml_snapshot(f"churn_snapshot_user_{user_id}", kind=_SNAPSHOT_KIND)
-        except Exception:
-            return None
-    return None
-
-
-def store_churn_snapshot(user_id, payload):
-    if is_enabled():
-        try:
-            return set_ml_snapshot(f"churn_snapshot_user_{user_id}", payload, kind=_SNAPSHOT_KIND)
-        except Exception:
-            return False
-    return False
